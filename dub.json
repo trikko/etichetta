@@ -1,0 +1,15 @@
+{
+	"authors": [
+		"Andrea Fontana"
+	],
+	"copyright": "Copyright © 2024, Andrea Fontana",
+	"dependencies": {
+		"gtk-d": "~>3.10.0"
+	},
+	"description": "A minimal D application.",
+	"license": "MIT",
+	"name": "etichetta",
+	"stringImportPaths": [
+		"res"
+	]
+}

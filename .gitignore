@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/etichetta
+etichetta.so
+etichetta.dylib
+etichetta.dll
+etichetta.a
+etichetta.lib
+etichetta-test-*
+dub.selections.json
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
