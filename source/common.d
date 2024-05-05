@@ -25,6 +25,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 module common;
 
+import std.algorithm : each;
+
 enum State
 {
 	EDITING,
@@ -81,13 +83,22 @@ static immutable defaultLabelColors = [
 	[0.866667, 0.937255, 1]
 ];
 
-alias StatusCallback = void delegate(State);
+alias StatusChangeCallback 				= void delegate(State);
+alias WorkingDirectoryChangeCallback 	= void delegate(string);
 
-private State              _status = State.EDITING;
-private StatusCallback[]   _statusCallback;
+private StatusChangeCallback[]   			_statusCallback;
+private WorkingDirectoryChangeCallback[]	_workingDirectoryCallback;
 
+private State 	_status 					= State.EDITING;
+private string _workingDirectory		= string.init;
 
 State    status()          { return _status; }
-void     status(State s)   { import std.algorithm : each; _status = s;  _statusCallback.each!(cb => cb(s)); }
-void     addStatusCallback(StatusCallback cb) { _statusCallback ~= cb; }
+void     status(State s)   { _status = s;  _statusCallback.each!(cb => cb(s)); }
 
+void     addStatusChangeCallback(StatusChangeCallback cb) { _statusCallback ~= cb; }
+
+
+void 		workingDirectory(string dir) 	{ _workingDirectory = dir; _workingDirectoryCallback.each!(cb => cb(dir)); }
+string 	workingDirectory() 				{ return _workingDirectory; }
+
+void 		addWorkingDirectoryChangeCallback(WorkingDirectoryChangeCallback cb) { _workingDirectoryCallback ~= cb; }
