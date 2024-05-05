@@ -1,3 +1,28 @@
+/*
+Copyright (c) 2024 Andrea Fontana
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 module picture;
 
 import std;
@@ -5,9 +30,8 @@ import common;
 import viewport;
 import gdk.Pixbuf;
 
-import app : currentWorkingDirectory, resetZoom;
-import bindings : canvas, mnuZoomOnExit;
-
+import main : readAnnotations, writeAnnotations;
+import gui : canvas, mnuZoomOnExit, resetZoom;
 
 struct Picture
 {
@@ -74,33 +98,7 @@ struct Picture
 		width = pixbuf.getWidth;
 		height = pixbuf.getHeight;
 
-		// Get the filename without ext
-		auto filename = baseName(Picture.list[Picture.index]).stripExtension ~ ".txt";
-		auto labels = buildPath(currentWorkingDirectory, "labels", filename);
-
-		rects.length = 0;
-
-		if (exists(labels))
-		{
-			foreach(l; File(labels).byLine.filter!(a => a.length > 0))
-			{
-				auto parts = l.split(" ");
-				if (parts.length < 5)
-					continue;
-
-				Rectangle r;
-				double cx = parts[1].to!double;
-				double cy = parts[2].to!double;
-				r.p1.x = cx - parts[3].to!double / 2;
-				r.p1.y = cy - parts[4].to!double / 2;
-				r.p2.x = r.p1.x + parts[3].to!double;
-				r.p2.y = r.p1.y + parts[4].to!double;
-
-				r.label = parts[0].to!int;
-				rects ~= r;
-			}
-		}
-
+		rects = readAnnotations(Picture.list[Picture.index]);
 
 		if (ViewPort.roiTopLeft.x > Picture.width) ViewPort.roiTopLeft.x = 0;
 		if (ViewPort.roiTopLeft.y > Picture.height) ViewPort.roiTopLeft.y = 0;
@@ -118,25 +116,6 @@ struct Picture
 		canvas.queueDraw();
 	}
 
-
-	void save()
-	{
-		auto filename = baseName(Picture.list[Picture.index]).stripExtension ~ ".txt";
-		auto labels = buildPath(currentWorkingDirectory, "labels", filename);
-		auto f = File(labels, "w+");
-
-		info("Saving file (", Picture.rects.length , " lines): ", filename);
-
-		foreach(idx, r; rects)
-		{
-			auto cx = (r.p1.x + r.p2.x) / 2;
-			auto cy = (r.p1.y + r.p2.y) / 2;
-			auto w = r.p2.x - r.p1.x;
-			auto h = r.p2.y - r.p1.y;
-
-			auto line = format("%d %.20f %.20f %.20f %.20f", r.label, cx, cy, w, h);
-			f.writeln(line);
-		}
-	}
+	void save() { writeAnnotations(Picture.list[Picture.index], Picture.rects); }
 
 }

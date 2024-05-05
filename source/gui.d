@@ -1,14 +1,106 @@
-module actions;
+/*
+Copyright (c) 2024 Andrea Fontana
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+module gui;
+
+import common;
+import picture;
+import main : loadProject;
 
 import std;
-import app;
-import bindings;
+import gtkattributes;
+
+
 import gdk.Event, gtk.Widget,gtk.FileChooserDialog, gtk.Main;
-import gdk.Pixbuf, cairo.Context, gdk.Keysyms, gdk.Cairo;
+import gdk.Pixbuf, cairo.Context, gdk.Keysyms, gdk.Cairo, gtk.CellRendererText, gtk.CellRendererPixbuf;
 
 import common;
 import picture;
 import viewport;
+
+import gdk.Cursor;
+
+import gtk.Main, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry,
+	gtk.TreeView, gtk.TreeStore;
+
+import gdk.Pixbuf;
+
+import gdk.Event, gtk.Widget, gtk.Builder;
+import imports : LAYOUT;
+
+mixin GtkAttributes;
+
+@ui Window   		   wndLabels;
+@ui Window   		   mainWindow;
+
+@ui DrawingArea	   canvas;
+
+@ui EventBox 		   evtLayer;
+
+@ui CheckMenuItem		mnuZoomOnExit;
+@ui CheckMenuItem		mnuGuides;
+
+@ui MenuItem		   mnuExit;
+@ui MenuItem		   mnuOpen;
+@ui MenuItem		   mnuNextImage;
+@ui MenuItem 		   mnuPrevImage;
+@ui MenuItem		   mnuNextImageToAnnotate;
+@ui MenuItem 		   mnuPrevImageToAnnotate;
+@ui MenuItem		   mnuNextAnnotation;
+@ui MenuItem		   mnuPrevAnnotation;
+@ui MenuItem		   mnuAddAnnotation;
+@ui MenuItem		   mnuToggleZoom;
+@ui MenuItem		   mnuCancelAnnotation;
+@ui MenuItem		   mnuDeleteAnnotation;
+@ui MenuItem		   mnuUndo;
+@ui MenuItem		   mnuSetCurrentLabel;
+
+@ui Entry			   search;
+@ui TreeView		   lstLabels;
+
+TreeStore			store;
+
+string[]			labels;
+
+Point[] 			zoomLines;
+bool				isZooming = false;
+
+bool isGrabbing = false;
+bool showGuides = false;
+int  grabIndex = -1;
+
+Cursor standard;
+Cursor pencil;
+Cursor hand;
+Cursor handClosed;
+Cursor editing;
+Cursor[] directions;
+
+Point				lastMouseCoords;
+Point[] 			points;
+int				label = 1;
 
 Rectangle calculateBoundingBox(in Point[] points)
 {
@@ -27,7 +119,7 @@ Rectangle calculateBoundingBox(in Point[] points)
 
 void confirmAnnotation()
 {
-	if (status != State.DRAWING || points.length < 2)
+	if (status != State.ANNOTATING || points.length < 2)
 		return;
 
 	Rectangle r = calculateBoundingBox(points);
@@ -193,14 +285,7 @@ bool actionOpenDir(Event e, Widget w)
 		if (!mnuZoomOnExit.getActive)
 			resetZoom();
 
-		currentWorkingDirectory = dialog.getFilename;
-		if (!readPicturesDir())
-		{
-			Main.quit();
-			return true;
-		}
-
-		readLabels();
+		loadProject(dialog.getFilename);
 	}
 
 	return true;
@@ -239,11 +324,11 @@ void actionStartDrawing(bool force = false)
 {
 	isGrabbing = false;
 
-	if (status == State.DRAWING)
+	if (status == State.ANNOTATING)
 		confirmAnnotation();
 
-	if (!force && points.length <= 1 && status == State.DRAWING) status = State.EDITING;
-	else status = State.DRAWING;
+	if (!force && points.length <= 1 && status == State.ANNOTATING) status = State.EDITING;
+	else status = State.ANNOTATING;
 
 	points.length = 0;
 	mnuUndo.setSensitive(false);
@@ -306,7 +391,7 @@ void actionToggleZoom()
 			return;
 		}
 	}
-	else if (status == State.DRAWING)
+	else if (status == State.ANNOTATING)
 	{
 		static Rectangle lastRect;
 
@@ -335,7 +420,7 @@ void actionToggleZoom()
 
 void actionAnnotationCycling(bool forward)
 {
-	if (Picture.rects.length == 0 || status == State.DRAWING)
+	if (Picture.rects.length == 0 || status == State.ANNOTATING)
 		return;
 
 	if (isZoomedIn)
@@ -365,7 +450,7 @@ bool onKeyPress(Event e, Widget w)
 	switch (key)
 	{
       case GdkKeysyms.GDK_Return:
-         if (status == State.DRAWING)
+         if (status == State.ANNOTATING)
          {
             confirmAnnotation();
             actionEditingMode();
@@ -403,7 +488,7 @@ bool onKeyPress(Event e, Widget w)
 			break;
 
 		case GdkKeysyms.GDK_z, GdkKeysyms.GDK_Z:
-			if (e.key().state == ModifierType.CONTROL_MASK && status == State.DRAWING) actionUndoLastPoint();
+			if (e.key().state == ModifierType.CONTROL_MASK && status == State.ANNOTATING) actionUndoLastPoint();
 			else actionToggleZoom();
 			break;
 
@@ -559,7 +644,7 @@ bool onDraw(Context w, Widget e)
 	}
 
 
-	if (status == State.DRAWING)
+	if (status == State.ANNOTATING)
 	{
 		w.setDash([10,5,2,5], 0);
 		w.setLineWidth(2);
@@ -666,7 +751,7 @@ bool onClick(Event e, Widget w)
 
 	auto normalized = Point(coords.x / Picture.width, coords.y / Picture.height);
 
-	if (status == State.DRAWING)
+	if (status == State.ANNOTATING)
 	{
 		if (normalized.x < 0) normalized.x = 0;
 		if (normalized.x > 1) normalized.x = 1;
@@ -903,3 +988,255 @@ bool onKeyRelease(Event e, Widget w)
 
 	return true;
 }
+
+
+bool zoomToArea(Point topLeft, Point bottomRight, float padding = 0.05)
+{
+	if (padding)
+	{
+		auto tWidth = bottomRight.x - topLeft.x;
+		auto tHeight = bottomRight.y - topLeft.y;
+
+		topLeft.x -= tWidth * padding;
+		topLeft.y -= tHeight * padding;
+		bottomRight.x += tWidth * padding;
+		bottomRight.y += tHeight * padding;
+	}
+
+	if (topLeft.x > Picture.width) topLeft.x = Picture.width;
+	if (topLeft.y > Picture.height) topLeft.y = Picture.height;
+
+	if (bottomRight.x > Picture.width) bottomRight.x = Picture.width;
+	if (bottomRight.y > Picture.height) bottomRight.y = Picture.height;
+
+	if (topLeft.x < 0) topLeft.x = 0;
+	if (topLeft.y < 0) topLeft.y = 0;
+
+	if (bottomRight.x < 0) bottomRight.x = 0;
+	if (bottomRight.y < 0) bottomRight.y = 0;
+
+	// Calculate area in the picture coords space
+	{
+		auto width = (bottomRight.x - topLeft.x);
+		auto height = (bottomRight.y - topLeft.y);
+		auto area = width*height;
+
+		// Cancel zoom if area is too small
+		if (area < 8*8)
+		{
+			warning("Area too small: ", area, " squared pixels");
+			zoomLines.length = 0;
+			canvas.queueDraw();
+			return false;
+		}
+	}
+
+	ViewPort.roiTopLeft = topLeft;
+	ViewPort.roiBottomRight = bottomRight;
+	ViewPort.invalidated = true;
+	canvas.queueDraw();
+
+	return true;
+}
+
+bool zoomToViewPortArea(Point topLeft, Point bottomRight, float padding = 0.05)
+{
+	// Force min size
+	if (bottomRight.x - topLeft.x < 20)
+	{
+		topLeft.x -= 10;
+		bottomRight.x += 10;
+	}
+
+	if (bottomRight.y - topLeft.y < 20)
+	{
+		topLeft.y -= 10;
+		bottomRight.y += 10;
+	}
+
+	// Calculate area in the view port coords space
+	{
+		auto area = (bottomRight.x - topLeft.x) * (bottomRight.y - topLeft.y);
+
+		if (area < 25)
+		{
+			warning("Ignored : ", area, " squared pixels");
+			return false;
+		}
+	}
+
+	topLeft.x = topLeft.x / ViewPort.scale + ViewPort.roiTopLeft.x;
+	topLeft.y = topLeft.y / ViewPort.scale + ViewPort.roiTopLeft.y;
+	bottomRight.x = bottomRight.x / ViewPort.scale + ViewPort.roiTopLeft.x;
+	bottomRight.y = bottomRight.y / ViewPort.scale + ViewPort.roiTopLeft.y;
+
+	return zoomToArea(topLeft, bottomRight, padding);
+}
+
+bool isZoomedIn() { return !(ViewPort.roiBottomRight.x - ViewPort.roiTopLeft.x == Picture.width && ViewPort.roiBottomRight.y - ViewPort.roiTopLeft.y == Picture.height); }
+
+void resetZoom()
+{
+	ViewPort.roiTopLeft = Point(0, 0);
+	ViewPort.roiBottomRight = Point(Picture.width, Picture.height);
+	ViewPort.invalidated = true;
+	canvas.queueDraw();
+}
+
+
+void initGUI()
+{
+   Builder b = new Builder();
+   b.addFromString(LAYOUT);
+   b.bindAll!gui;
+
+   mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
+	mainWindow.showAll();
+
+   // Bind events
+	canvas.addOnDraw(toDelegate(&onDraw));
+
+	evtLayer.addOnButtonPress(toDelegate(&onClick));			// Click on image
+	evtLayer.addOnMotionNotify(toDelegate(&onMotion));		// Mouse move on image
+
+	mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
+	mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
+
+	mnuOpen.addOnButtonPress(toDelegate(&actionOpenDir));				// Open a directory
+
+	mnuExit.addOnButtonPress( (Event e, Widget w){ Main.quit(); return true; } );
+
+	mnuNextImage.addOnButtonPress( (Event e, Widget w){ actionPictureCycling(true); return true; } );
+	mnuPrevImage.addOnButtonPress( (Event e, Widget w){ actionPictureCycling(false); return true; } );
+	mnuNextImageToAnnotate.addOnButtonPress( (Event e, Widget w){ actionPictureCycling(true, true); return true; } );
+	mnuPrevImageToAnnotate.addOnButtonPress( (Event e, Widget w){ actionPictureCycling(false, true); return true; } );
+
+	mnuNextAnnotation.addOnButtonPress( (Event e, Widget w){ actionAnnotationCycling(true); return true; } );
+
+	mnuPrevAnnotation.addOnButtonPress( (Event e, Widget w){ actionAnnotationCycling(false); return true; } );
+	mnuAddAnnotation.addOnButtonPress( (Event e, Widget w){ actionStartDrawing(true); return true; } );
+
+	mnuToggleZoom.addOnButtonPress( (Event e, Widget w){ actionToggleZoom(); return true; } );
+	mnuCancelAnnotation.addOnButtonPress( (Event e, Widget w){ actionEditingMode(); return true; } );
+	mnuDeleteAnnotation.addOnButtonPress( (Event e, Widget w){ actionDeleteRect(); return true; } );
+
+	mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndoLastPoint(); return true; } );
+	mnuGuides.addOnButtonPress( (Event e, Widget w){ actionToggleGuides(); return true; } );
+
+	mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
+
+
+	lstLabels.addOnRowActivated( (path, col, tv) {
+
+		auto sel = lstLabels.getSelection().getSelected;
+		if (sel && sel.userData !is null)
+		{
+			auto val = store.getValue(sel, 2).get!uint;
+			actionChangeLabel(val);
+			wndLabels.hide();
+		}
+
+	});
+
+	store = new TreeStore([GType.OBJECT, GType.STRING, GType.UINT]);
+
+	import gtk.TreeIter;
+	import gtk.TreeViewColumn;
+
+	import pango.PgFontDescription;
+	wndLabels.addOnFocusOut( (Event e, Widget w) { wndLabels.hide(); return true; } );
+
+
+	lstLabels.appendColumn(new TreeViewColumn("Color",new CellRendererPixbuf(), "pixbuf", 0));
+	lstLabels.appendColumn(new TreeViewColumn("Label",new CellRendererText(), "text", 1));
+	lstLabels.setModel(store);
+	lstLabels.setHeadersVisible(false);
+
+	import gdk.Color : GdkColorspace;
+	import gtk.CssProvider;
+	import gtk.StyleContext;
+
+	CssProvider css = new CssProvider();
+	css.loadFromData("treeview { padding:10px; font-size: 15px;} ");
+
+	StyleContext.addProviderForScreen(mainWindow.getScreen(), css, 800);
+
+	search.addOnChanged( (e) { actionSearchLabel(search.getText().strip); } );
+
+	 search.addOnKeyPress( (Event e, Widget w) {
+		 if (e.key().keyval == GdkKeysyms.GDK_Return)
+		 {
+			 auto sel = lstLabels.getSelection().getSelected;
+			 if (sel)
+			 {
+				auto val = store.getValue(sel, 2).get!uint;
+
+				actionChangeLabel(val);
+				wndLabels.hide();
+				return true;
+			 }
+		 }
+		 else if (e.key.keyval == GdkKeysyms.GDK_Escape)
+		 {
+			// Close popup if esc is pressed while the search is empty
+			if (search.getText().empty())
+			{
+				wndLabels.hide();
+				return true;
+			}
+
+			search.setText("");
+		 }
+		 else if (e.key.keyval == GdkKeysyms.GDK_Down)
+		 {
+			auto sel = lstLabels.getSelection().getSelected;
+			store.iterNext(sel);
+			lstLabels.getSelection().selectIter(sel);
+			return true;
+		 }
+		 else if (e.key.keyval == GdkKeysyms.GDK_Up)
+		 {
+			auto sel = lstLabels.getSelection().getSelected;
+			store.iterPrevious(sel);
+			lstLabels.getSelection().selectIter(sel);
+			return true;
+		 }
+
+		 return false;
+	 });
+
+
+   addStatusCallback(
+      (s)
+      {
+         mnuDeleteAnnotation.setSensitive(s == State.EDITING && Picture.rects.length > 0);
+         mnuCancelAnnotation.setSensitive(s == State.ANNOTATING);
+         mnuNextAnnotation.setSensitive(s == State.EDITING && Picture.rects.length > 1);
+         mnuPrevAnnotation.setSensitive(s == State.EDITING && Picture.rects.length > 1);
+         mnuUndo.setSensitive(s == State.ANNOTATING && points.length > 0);
+
+         if (s == State.ANNOTATING) mainWindow.setCursor(pencil);
+         else mainWindow.setCursor(standard);
+      }
+   );
+
+	// Preload cursors
+	standard = new Cursor(canvas.getDisplay(), "default");
+	hand = new Cursor(canvas.getDisplay(), "grab");
+	handClosed = new Cursor(canvas.getDisplay(), "grabbing");
+	editing = new Cursor(CursorType.DOT);
+
+	directions = [
+		new Cursor(canvas.getDisplay(), "nw-resize"),
+		new Cursor(canvas.getDisplay(), "row-resize"),
+		new Cursor(canvas.getDisplay(), "ne-resize"),
+		new Cursor(canvas.getDisplay(), "col-resize"),
+		new Cursor(canvas.getDisplay(), "se-resize"),
+		new Cursor(canvas.getDisplay(), "row-resize"),
+		new Cursor(canvas.getDisplay(), "sw-resize"),
+		new Cursor(canvas.getDisplay(), "col-resize")
+	];
+
+	pencil = new Cursor(CursorType.PENCIL);
+}
+
