@@ -33,6 +33,6 @@ void main()
       }
       else if (!exists(dir)) mkdirRecurse(dir);
 
-      write(dest, am.expandedData);
+      write(dest, zip.expand(am));
    }
 }
