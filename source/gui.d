@@ -129,8 +129,6 @@ struct GUI
 
 		store.clear();
 
-		bool found = false;
-
 		if (text.empty) foreach(idx; 1 .. labels.length) appendFromIndex(idx); // Show all if search is empty
 		else if (text.all!isDigit) appendFromIndex(text.to!size_t);	// Show the label if the search is a number
 		else
@@ -221,7 +219,7 @@ struct GUI
 
 	}
 
-	bool actionOpenDir(Event e, Widget w)
+	bool actionOpenDir()
 	{
 		// Let user choose a directory
 		auto dialog = new FileChooserDialog("Choose a directory", mainWindow, FileChooserAction.SELECT_FOLDER, ["Cancel", "Open"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
@@ -486,6 +484,10 @@ struct GUI
 
 			case GdkKeysyms.GDK_Shift_L:
 				actionStartZoomDrawing();
+				break;
+
+			case GdkKeysyms.GDK_F5:
+				reloadDirectory();
 				break;
 
 			default:
@@ -1096,6 +1098,7 @@ struct GUI
 
 	void reinit()
 	{
+		mainWindow.setTitle("Etichetta " ~ VERSION_STRING ~ " - GitHub: trikko/etichetta");
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
 
@@ -1108,7 +1111,8 @@ struct GUI
 		mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
-		mnuOpen.addOnButtonPress(toDelegate(&actionOpenDir));				// Open a directory
+		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
+		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 
 		mnuExit.addOnButtonPress( (Event e, Widget w){ Main.quit(); return true; } );
 

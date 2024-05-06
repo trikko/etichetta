@@ -27,6 +27,8 @@ module common;
 
 import std.algorithm : each;
 
+immutable VERSION_STRING = "v0.1.0";
+
 enum State
 {
 	EDITING,
@@ -97,7 +99,7 @@ void     status(State s)   { _status = s;  _statusCallback.each!(cb => cb(s)); }
 
 void     addStatusChangeCallback(StatusChangeCallback cb) { _statusCallback ~= cb; }
 
-
+void 		reloadDirectory() 				{ _workingDirectoryCallback.each!(cb => cb(workingDirectory)); }
 void 		workingDirectory(string dir) 	{ _workingDirectory = dir; _workingDirectoryCallback.each!(cb => cb(dir)); }
 string 	workingDirectory() 				{ return _workingDirectory; }
 

@@ -45,6 +45,7 @@ mixin GtkAttributes;
 
 @ui MenuItem		   mnuExit;
 @ui MenuItem		   mnuOpen;
+@ui MenuItem         mnuReload;
 @ui MenuItem		   mnuNextImage;
 @ui MenuItem 		   mnuPrevImage;
 @ui MenuItem		   mnuNextImageToAnnotate;
