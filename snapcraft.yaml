@@ -1,0 +1,42 @@
+name: etichetta
+version: 0.1.0
+summary: A YOLO annotator, for human beings
+description: |
+  Etichetta is a simple YOLO annotator, for human beings. It allows you to
+  annotate images with bounding boxes, and save the annotations in the YOLO
+  format.
+confinement: classic
+grade: stable
+base: core24
+icon: snap/gui/etichetta.png
+
+apps:
+  etichetta:
+    command: etichetta
+
+parts:
+  etichetta:
+    source: https://github.com/trikko/etichetta.git
+    source-type: git
+    plugin: make
+    override-build: |
+      dub build --build=release && mv etichetta $SNAPCRAFT_PART_INSTALL/etichetta
+    build-packages:
+    - build-essential
+    - ldc
+    - dub
+    stage-packages:
+    - libgtk-3-0
+    - libgdk-pixbuf2.0-dev
+    - libglib2.0-0
+    - libgobject-2.0-0
+    - libgio-2.0-0
+    - libpango-1.0-0
+    - libpangocairo-1.0-0
+    - libcairo2
+    - libpng-dev
+    - libjpeg-dev
+    - libphobos2-ldc-shared106
+
+    build-attributes:
+    - enable-patchelf
