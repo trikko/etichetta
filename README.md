@@ -3,6 +3,8 @@
 
 Etichetta is a project that aims to provide a simple and efficient way to annotate images.
 
+<img src="https://github.com/trikko/etichetta/assets/647157/7ab51282-e2ed-435e-b44b-f9073c0df18c" width=480>
+
 ## Prebuilt packages (Linux, Windows)
 > [!NOTE]
 > The packages are not yet available. You can build and run a preview version of etichetta by following the instructions below.
