@@ -1,5 +1,5 @@
 [Setup]
-AppName=etichetta
+AppName=Etichetta
 AppVersion=0.1
 DefaultDirName={pf}\etichetta
 DefaultGroupName=etichetta
@@ -11,14 +11,14 @@ LicenseFile=LICENSE
 
 
 [Files]
-Source: "deployment\windows\bin\*.*"; DestDir: "{app}\bin"; Flags: recursesubdirs
-Source: "deployment\windows\etc\*.*"; DestDir: "{app}\etc"; Flags: recursesubdirs
-Source: "deployment\windows\share\*.*"; DestDir: "{app}\share"; Flags: recursesubdirs
-Source: "deployment\windows\lib\*.*"; DestDir: "{app}\lib"; Flags: recursesubdirs
+Source: "output\bin\*.*"; DestDir: "{app}\bin"; Flags: recursesubdirs
+Source: "deployment\etc\*.*"; DestDir: "{app}\etc"; Flags: recursesubdirs
+Source: "deployment\share\*.*"; DestDir: "{app}\share"; Flags: recursesubdirs
+Source: "deployment\lib\*.*"; DestDir: "{app}\lib"; Flags: recursesubdirs
 Source: "res\logo.ico"; DestDir: "{app}"; DestName: "etichetta.ico"; Flags: recursesubdirs
 
 [Tasks]
-Name: desktopicon; Description: "A YOLO annotator, for human beings"; GroupDescription: "Additional icons:";
+Name: desktopicon; Description: "Add link on desktop"; GroupDescription: "Additional icons:";
 
 [Icons]
 Name: "{userdesktop}\etichetta"; Filename: "{app}\bin\etichetta.exe"; IconFilename: "{app}\etichetta.ico"; Tasks: desktopicon
@@ -26,4 +26,4 @@ Name: "{group}\etichetta"; Filename: "{app}\bin\etichetta.exe"; IconFilename: "{
 Name: "{app}\Start etichetta"; Filename: "{app}\bin\etichetta.exe"; IconFilename: "{app}\etichetta.ico"
 
 [Run]
-Filename: "{app}\bin\etichetta.exe"; Description: "Launch etichetta"; Flags: postinstall
+Filename: "{app}\bin\etichetta.exe"; Description: "Launch etichetta, now!"; Flags: postinstall
