@@ -680,14 +680,11 @@ struct GUI
 			}
 
 			// Draw a small label under the rect
-			if (r.label > 0 && r.label < labels.length)
+			if (label > 0 && label < labels.length)
 			{
-				auto xx1 = normalizedToViewPort(r.p1);
-				auto xx2 = normalizedToViewPort(r.p2);
-
 				w.setFontSize(10);
-				w.moveTo(Picture.ViewPort.offsetX + xx1.x, Picture.ViewPort.offsetY + xx2.y + 18);
-				w.showText(labels[r.label]);
+				w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 18);
+				w.showText(labels[label]);
 			}
 
 			if (showGuides)
