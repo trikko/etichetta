@@ -1098,6 +1098,18 @@ struct GUI
 
 	void reinit()
 	{
+		static Pixbuf logo = null;
+
+		if (logo is null)
+		{
+			import imports : LOGO;
+			string tmpLogo = buildPath(tempDir, "etichetta-logo-tmp.svg");
+			std.file.write(tmpLogo, LOGO);
+			logo = new Pixbuf(tmpLogo);
+			remove(tmpLogo);
+		}
+
+		mainWindow.setIcon(logo);
 		mainWindow.setTitle("Etichetta " ~ VERSION_STRING ~ " - GitHub: trikko/etichetta");
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
