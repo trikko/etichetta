@@ -34,7 +34,7 @@ dub --build=release
 
 ## Etichetta on macOS (with Docker and XQuartz)
 
-To run etichetta on a macOS machine, you can run it inside a Docker container and connect a display, using XQuartz.
+I do not have access to any machine with macOS and therefore it is difficult to perform the necessary tests for development. Anyway to try etichetta on a macOS machine, you can run it inside a Docker container and connect a display, using XQuartz.
 
 ### Step #1. Build the docker image (one time)
 Save the following code in a file named `Dockerfile`:
