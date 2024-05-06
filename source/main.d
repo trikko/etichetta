@@ -73,14 +73,16 @@ int mainImpl(string[] args)
 	return 0;
 }
 
-version(Windows)
+// IGNORED, for now.
+version(none)
 {
-	pragma(lib, "user32")
+	pragma(lib, "user32");
 
    // Copy/Pasted from DWiki
    // It calls winmain to avoid terminal popup.
    import core.runtime;
    import core.sys.windows.windows;
+	import std.string : toStringz;
 
    extern (Windows)
    int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)

@@ -223,7 +223,7 @@ struct Picture
 		{
 			foreach(l; File(labels).byLine.filter!(a => a.length > 0))
 			{
-				auto parts = l.split(" ");
+				auto parts = l.chomp.split(" ");
 				if (parts.length < 5)
 					continue;
 
