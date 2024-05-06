@@ -11,5 +11,9 @@
 	"name": "etichetta",
 	"stringImportPaths": [
 		"res"
+	],
+	"targetPath-windows": "deployment/windows/bin",
+	"preGenerateCommands-windows": [
+		"dub run --single deployment/deploy.d"
 	]
 }
