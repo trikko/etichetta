@@ -16,6 +16,7 @@ deployment/windows/*
 *.o
 *.obj
 *.lst
-Output/
+output/*
+deployment/unpacker
 *.snap
 InstallationLog.txt

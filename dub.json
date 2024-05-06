@@ -12,7 +12,7 @@
 	"stringImportPaths": [
 		"res"
 	],
-	"targetPath-windows": "deployment\\windows\\bin",
+	"targetPath": "output/bin",
 	"preGenerateCommands-windows": [
 		"dub run --single deployment/deploy.d"
 	]

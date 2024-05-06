@@ -14,7 +14,7 @@ void main()
    chdir(dirName(thisExePath));
 
    // Extract file "window-redist" inside "windows" folder if not already extracted
-   auto canary = buildPath("windows", "bin", "libgtk-3-0.dll");
+   auto canary = buildPath("..","output", "bin", "libgtk-3-0.dll");
 
    if (exists(canary))
       return;
@@ -23,7 +23,7 @@ void main()
 
    foreach (string name, ArchiveMember am; zip.directory)
    {
-      auto dest = buildPath("windows",name);
+      auto dest = buildPath("..", "output", name);
       auto dir = dirName(dest);
 
       if (dest.endsWith("/") || dest.endsWith("\\"))
