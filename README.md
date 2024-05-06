@@ -5,7 +5,7 @@ Etichetta is a project that aims to provide a simple and efficient way to annota
 
 ## Prebuilt packages (Linux, Windows)
 > [!NOTE]
-> The packages are not yet available. You can build and run a prview version of etichetta by following the instructions below.
+> The packages are not yet available. You can build and run a preview version of etichetta by following the instructions below.
 
 [![Snap](https://img.shields.io/badge/-Linux_SNAP_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/tshare/releases/latest/download/etichetta.snap)
 
