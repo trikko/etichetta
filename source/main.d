@@ -74,9 +74,10 @@ int mainImpl(string[] args)
 }
 
 // IGNORED, for now.
-version(none)
+version(Windows)
 {
 	pragma(lib, "user32");
+	pragma(lib, "gdi32");
 
    // Copy/Pasted from DWiki
    // It calls winmain to avoid terminal popup.
@@ -88,6 +89,10 @@ version(none)
    int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
    {
       int result;
+
+		// Windows do not like stderr to be used in gui mode
+		import std.logger : LogLevel, globalLogLevel;
+		globalLogLevel = LogLevel.off;
 
       try
       {
