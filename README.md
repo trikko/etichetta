@@ -1,5 +1,5 @@
 # Etichetta [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/trikko/etichetta/blob/main/LICENSE) [![Donate](https://img.shields.io/badge/paypal-buy_me_a_beer-FFEF00?logo=paypal&logoColor=white)](https://paypal.me/andreafontana/5)
-<sub>[IPA](https://en.wiktionary.org/wiki/Wiktionary:International_Phonetic_Alphabet): /e-ti-'ket-ta/</sub>
+<sub>International Phonetic Alphabet: /e-ti-'ket-ta/ [mp3](https://www.dropbox.com/scl/fi/ow41ztln8vcbw8t10bcd1/etichetta.mp3?rlkey=6lecfwxq9h2aj6nzzimjlejdp&st=n1d6clii&dl=0)</sub>
 
 Etichetta is a project that aims to provide a simple and efficient way to annotate images.
 
