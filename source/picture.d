@@ -137,8 +137,46 @@ struct Picture
 	Pixbuf 	pixbuf;
 
 	Rectangle[] rects;
+	Rectangle[][] history; // Track the history of the annotations
+
+	size_t historyIndex = 0;
 
 	string current() { return list[index]; }
+
+	void historyBack()
+	{
+		if (historyIndex == 0)
+			return;
+
+		historyIndex--;
+		rects = history[historyIndex].dup;
+
+		GUI.updateHistoryMenu();
+	}
+
+	void historyForward()
+	{
+		if (historyIndex == history.length - 1)
+			return;
+
+		historyIndex++;
+		rects = history[historyIndex].dup;
+
+		GUI.updateHistoryMenu();
+	}
+
+   void historyCommit()
+	{
+		// Remove the future
+		history.length = historyIndex + 1;
+
+		// Add the new state
+		history ~= rects.dup;
+		historyIndex++;
+
+		GUI.updateHistoryMenu();
+	}
+
 
 	void nextRect()
 	{
@@ -239,6 +277,10 @@ struct Picture
 				rects ~= r;
 			}
 		}
+
+		history = [rects.dup];
+		historyIndex = 0;
+		GUI.updateHistoryMenu();
 	}
 
 	void writeAnnotations()
@@ -261,6 +303,8 @@ struct Picture
 		}
 
 		f.close();
+
+		historyCommit();
 	}
 
 	bool readPictures()

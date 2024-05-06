@@ -320,14 +320,27 @@ struct GUI
 
 	}
 
-	void actionUndoLastPoint()
+	void actionUndo()
 	{
-		if (points.length > 0)
-			points.length = points.length - 1;
+		if (status == State.ANNOTATING)
+		{
+			if (points.length > 0)
+				points.length = points.length - 1;
 
-		mnuUndo.setSensitive(points.length > 0);
+			mnuUndo.setSensitive(points.length > 0);
+		}
+		else Picture.historyBack();
 
 		canvas.queueDraw();
+	}
+
+	void actionRedo()
+	{
+		if (status == State.EDITING)
+		{
+			Picture.historyForward();
+			canvas.queueDraw();
+		}
 	}
 
 	void actionStartZoomDrawing()
@@ -451,7 +464,12 @@ struct GUI
 				break;
 
 			case GdkKeysyms.GDK_z, GdkKeysyms.GDK_Z:
-				if (e.key().state == ModifierType.CONTROL_MASK && status == State.ANNOTATING) actionUndoLastPoint();
+				if (e.key().state == ModifierType.CONTROL_MASK) actionUndo();
+				else actionToggleZoom();
+				break;
+
+			case GdkKeysyms.GDK_y, GdkKeysyms.GDK_Y:
+				if (e.key().state == ModifierType.CONTROL_MASK) actionRedo();
 				else actionToggleZoom();
 				break;
 
@@ -459,7 +477,7 @@ struct GUI
 				actionAnnotationCycling(key == GdkKeysyms.GDK_n || key == GdkKeysyms.GDK_N);
 				break;
 
-			case GdkKeysyms.GDK_Control_L:
+			case GdkKeysyms.GDK_Shift_L:
 				actionStartZoomDrawing();
 				break;
 
@@ -694,6 +712,14 @@ struct GUI
 
 	}
 
+	void updateHistoryMenu()
+	{
+		if (status == State.EDITING)
+		{
+			mnuUndo.setSensitive(Picture.historyIndex > 0);
+			mnuRedo.setSensitive(Picture.historyIndex < Picture.history.length - 1);
+		}
+	}
 
 	bool onClick(Event e, Widget w)
 	{
@@ -929,7 +955,7 @@ struct GUI
 
 	bool onKeyRelease(Event e, Widget w)
 	{
-		if (e.key().keyval == GdkKeysyms.GDK_Control_L)
+		if (e.key().keyval == GdkKeysyms.GDK_Shift_L)
 		{
 			isZooming = false;
 
@@ -1093,7 +1119,9 @@ struct GUI
 		mnuCancelAnnotation.addOnButtonPress( (Event e, Widget w){ actionEditingMode(); return true; } );
 		mnuDeleteAnnotation.addOnButtonPress( (Event e, Widget w){ actionDeleteRect(); return true; } );
 
-		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndoLastPoint(); return true; } );
+		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndo(); return true; } );
+		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionRedo(); return true; } );
+
 		mnuGuides.addOnButtonPress( (Event e, Widget w){ actionToggleGuides(); return true; } );
 
 		mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
@@ -1192,8 +1220,17 @@ struct GUI
 				mnuPrevAnnotation.setSensitive(s == State.EDITING && Picture.rects.length > 1);
 				mnuUndo.setSensitive(s == State.ANNOTATING && points.length > 0);
 
-				if (s == State.ANNOTATING) mainWindow.setCursor(pencil);
-				else mainWindow.setCursor(standard);
+				if (s == State.ANNOTATING)
+				{
+					mainWindow.setCursor(pencil);
+					mnuRedo.setSensitive(false);
+					mnuUndo.setSensitive(points.length > 0);
+				}
+				else
+				{
+					updateHistoryMenu();
+					mainWindow.setCursor(standard);
+				}
 			}
 		);
 

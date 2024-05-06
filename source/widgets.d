@@ -56,6 +56,7 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuCancelAnnotation;
 @ui MenuItem		   mnuDeleteAnnotation;
 @ui MenuItem		   mnuUndo;
+@ui MenuItem		   mnuRedo;
 @ui MenuItem		   mnuSetCurrentLabel;
 
 @ui Entry			   search;

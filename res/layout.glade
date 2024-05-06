@@ -66,8 +66,23 @@
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">Undo last added point</property>
+                        <property name="label" translatable="yes">Undo</property>
                         <accelerator key="z" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuRedo">
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Redo</property>
+                        <accelerator key="y" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                     <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
                       </object>
                     </child>
                     <child>
