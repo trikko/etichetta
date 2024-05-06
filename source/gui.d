@@ -1114,6 +1114,11 @@ struct GUI
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
 
+		wndAbout.addOnDelete( (Event e, Widget w){ wndAbout.hide(); return true; } );
+		imgLogo.setFromPixbuf(logo);
+		btnWebsite.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://github.com/trikko/etichetta", 0); return true; } );
+		btnDonate.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://www.paypal.me/andreafontana/5", 0); return true; } );
+
 		// Bind events
 		canvas.addOnDraw(toDelegate(&onDraw));
 
@@ -1149,6 +1154,8 @@ struct GUI
 
 		mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
 
+		mnuAbout.addOnButtonPress( (Event e, Widget w){ wndAbout.showAll(); return true; } );
+
 		readLabels();
 		addWorkingDirectoryChangeCallback( (dir) { readLabels(); } );
 
@@ -1171,7 +1178,6 @@ struct GUI
 
 		import pango.PgFontDescription;
 		wndLabels.addOnFocusOut( (Event e, Widget w) { wndLabels.hide(); return true; } );
-
 
 		lstLabels.appendColumn(new TreeViewColumn("Color",new CellRendererPixbuf(), "pixbuf", 0));
 		lstLabels.appendColumn(new TreeViewColumn("Label",new CellRendererText(), "text", 1));

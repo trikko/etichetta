@@ -27,13 +27,15 @@ module widgets;
 
 import imports : LAYOUT;
 import gtkattributes;
+import gtk.Button;
 
-import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox,
-   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView;
+import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button,
+   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image;
 
 mixin GtkAttributes;
 
 @ui Window   		   wndLabels;
+@ui Dialog           wndAbout;
 @ui Window   		   mainWindow;
 
 @ui DrawingArea	   canvas;
@@ -59,6 +61,11 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuUndo;
 @ui MenuItem		   mnuRedo;
 @ui MenuItem		   mnuSetCurrentLabel;
+@ui MenuItem		   mnuAbout;
+
+@ui Button           btnWebsite;
+@ui Button           btnDonate;
+@ui Image            imgLogo;
 
 @ui Entry			   search;
 @ui TreeView		   lstLabels;
