@@ -351,9 +351,10 @@ struct GUI
 
 	void actionToggleZoom()
 	{
-		if (!isZoomedIn && status == State.EDITING)
+		if (status == State.EDITING)
 		{
-			if(Picture.rects.length > 0)
+			if (isZoomedIn) resetZoom();
+			else if(Picture.rects.length > 0)
 			{
 				auto r = Picture.rects[0];
 
@@ -371,9 +372,10 @@ struct GUI
 		{
 			static Rectangle lastRect;
 
+			immutable hasBox = points.length > 1;
 			Rectangle r;
 
-			if(points.length > 1)
+			if(hasBox)
 			{
 				r = calculateBoundingBox(points);
 
@@ -383,15 +385,20 @@ struct GUI
 				r.p2.y *= Picture.height;
 			}
 
-			if (r != lastRect)
+			immutable zoomIn =
+				(!isZoomedIn && hasBox) ||	// Zoom in if there is a box and we are not zoomed in
+				(isZoomedIn && hasBox && lastRect != r); // Zoom in if the box changed
+
+			if (zoomIn)
 			{
 				zoomToArea(r.p1, r.p2, 0.4);
 				lastRect = r;
-				return;
 			}
+			else if (isZoomedIn)
+				resetZoom();	// Reset zoom if we are zoomed in
+
 		}
 
-		resetZoom();
 	}
 
 	void actionAnnotationCycling(bool forward)
