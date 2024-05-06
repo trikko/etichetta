@@ -10,8 +10,12 @@ etichetta.a
 etichetta.lib
 etichetta-test-*
 dub.selections.json
+deployment/windows/*
 *.exe
 *.pdb
 *.o
 *.obj
 *.lst
+Output/
+*.snap
+InstallationLog.txt
