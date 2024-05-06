@@ -491,7 +491,6 @@ struct GUI
 				break;
 
 			default:
-				debug info("KeyPressed not handled: ", key);
 				break;
 		}
 
