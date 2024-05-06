@@ -2,7 +2,7 @@ name: etichetta
 version: 0.1.0
 summary: A YOLO annotator, for human beings
 description: |
-  Etichetta is a simple YOLO annotator, for human beings. It allows you to
+  Etichetta is a YOLO annotator, for human beings. It allows you to
   annotate images with bounding boxes, and save the annotations in the YOLO
   format.
 confinement: classic
@@ -20,7 +20,7 @@ parts:
     source-type: git
     plugin: make
     override-build: |
-      dub build --build=release && mv etichetta $SNAPCRAFT_PART_INSTALL/etichetta
+      dub build --build=release && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
     build-packages:
     - build-essential
     - ldc
