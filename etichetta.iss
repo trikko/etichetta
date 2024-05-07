@@ -1,6 +1,6 @@
 [Setup]
 AppName=Etichetta
-AppVersion=0.1
+AppVersion=0.1.1
 DefaultDirName={pf}\etichetta
 DefaultGroupName=etichetta
 UninstallDisplayIcon={app}\etichetta.ico
