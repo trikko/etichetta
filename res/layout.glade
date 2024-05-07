@@ -244,11 +244,17 @@
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
                     <child>
-                      <object class="GtkImageMenuItem" id="mnuAbout">
+                      <object class="GtkMenuItem" id="mnuTutorial">
+                        <property name="label" translatable="yes">Quick start...</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuAbout">
                         <property name="label" translatable="yes">About Etichetta...</property>
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
-                        <property name="use-stock">False</property>
                       </object>
                     </child>
                   </object>

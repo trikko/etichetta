@@ -606,11 +606,15 @@ struct GUI
 				// Draw a small label under the rect
 				if (r.label > 0 && r.label < labels.length)
 				{
-					auto xx1 = normalizedToViewPort(r.p1);
-					auto xx2 = normalizedToViewPort(r.p2);
 
+					cairo_text_extents_t te;
 					w.setFontSize(10);
-					w.moveTo(Picture.ViewPort.offsetX + xx1.x, Picture.ViewPort.offsetY + xx2.y + 18);
+					w.textExtents(labels[r.label], &te);
+					w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, te.height + 4);
+					w.fill();
+
+					w.setSourceRgba(0,0,0, 0.8);
+					w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 18);
 					w.showText(labels[r.label]);
 				}
 
@@ -681,8 +685,15 @@ struct GUI
 			}
 
 			// Draw a small label under the rect
-			if (label > 0 && label < labels.length)
+			if (points.length > 1 && label > 0 && label < labels.length)
 			{
+				cairo_text_extents_t te;
+				w.setFontSize(10);
+				w.textExtents(labels[label], &te);
+				w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, te.height + 4);
+				w.fill();
+
+				w.setSourceRgba(0,0,0, 0.8);
 				w.setFontSize(10);
 				w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 18);
 				w.showText(labels[label]);
@@ -1152,6 +1163,7 @@ struct GUI
 		mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
 
 		mnuAbout.addOnButtonPress( (Event e, Widget w){ wndAbout.showAll(); return true; } );
+		mnuTutorial.addOnButtonPress( (Event e, Widget w){ mainWindow.showUriOnWindow(mainWindow, "https://github.com/trikko/etichetta/blob/main/HOWTO.md", 0); return true; } );
 
 		readLabels();
 		addWorkingDirectoryChangeCallback( (dir) { readLabels(); } );

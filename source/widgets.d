@@ -62,6 +62,7 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuRedo;
 @ui MenuItem		   mnuSetCurrentLabel;
 @ui MenuItem		   mnuAbout;
+@ui MenuItem         mnuTutorial;
 
 @ui Button           btnWebsite;
 @ui Button           btnDonate;
