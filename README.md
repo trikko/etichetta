@@ -24,32 +24,9 @@ dub --build=release
 
 To run etichetta on a macOS machine, you can run it inside a Docker container and connect a display, using XQuartz.
 
-### Step #1. Build the docker image (one time)
-Save the following code in a file named `Dockerfile`:
+You can use the scripts inside the folder `deployment`.
 
-```Dockerfile
-FROM trikko/dlang-ubuntu
-RUN sudo apt-get update
-RUN sudo apt-get install libgtk-3-0 git -y
-RUN git clone https://github.com/trikko/etichetta
-RUN cd etichetta && dub build --build=release
-WORKDIR /home/user/src/etichetta
-
-ENTRYPOINT ./output/bin/etichetta
-```
-
-Build the image:
-
-```
-docker build -t etichetta .
-```
-
-### Step #2. Run the container
-```bash
-open -a XQuartz
-xhost +localhost
-docker run -ti --rm -e DISPLAY=host.docker.internal:0 -v /tmp/.X11-unix:/tmp/.X11-unix etichetta`
-```
+Build the last docker image running `./build-docker-etichetta.sh` and run it using `./run-docker-etichetta.sh`
 
 ## License
 

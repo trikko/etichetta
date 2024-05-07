@@ -12,9 +12,9 @@ LicenseFile=LICENSE
 
 [Files]
 Source: "output\bin\*.*"; DestDir: "{app}\bin"; Flags: recursesubdirs
-Source: "deployment\etc\*.*"; DestDir: "{app}\etc"; Flags: recursesubdirs
-Source: "deployment\share\*.*"; DestDir: "{app}\share"; Flags: recursesubdirs
-Source: "deployment\lib\*.*"; DestDir: "{app}\lib"; Flags: recursesubdirs
+Source: "output\etc\*.*"; DestDir: "{app}\etc"; Flags: recursesubdirs
+Source: "output\share\*.*"; DestDir: "{app}\share"; Flags: recursesubdirs
+Source: "output\lib\*.*"; DestDir: "{app}\lib"; Flags: recursesubdirs
 Source: "res\logo.ico"; DestDir: "{app}"; DestName: "etichetta.ico"; Flags: recursesubdirs
 
 [Tasks]
