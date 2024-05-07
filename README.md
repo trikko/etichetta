@@ -3,7 +3,7 @@
 
 Etichetta is a project that aims to provide a simple and efficient way to annotate images.
 
-<img src="https://github.com/trikko/etichetta/assets/647157/7ab51282-e2ed-435e-b44b-f9073c0df18c" width=480>
+<img src="https://github.com/trikko/etichetta/assets/647157/2e16f5eb-948c-4c92-9041-6cc3f9f15132" width=480>
 
 ## Quick start
 A simple tutorial to start using Etichetta can be found on the [HOWTO](https://github.com/trikko/etichetta/blob/main/HOWTO.md) page.
