@@ -427,6 +427,7 @@ struct GUI
 	{
 
 		uint key = e.key().keyval;
+		bool isCtrlPressed = e.key().state == ModifierType.CONTROL_MASK || e.key().state == cast(GdkModifierType)268435472;
 
 		switch (key)
 		{
@@ -439,7 +440,7 @@ struct GUI
 				break;
 
 			case GdkKeysyms.GDK_Right, GdkKeysyms.GDK_Left:
-				actionPictureCycling(key == GdkKeysyms.GDK_Right, e.key().state == ModifierType.CONTROL_MASK);
+				actionPictureCycling(key == GdkKeysyms.GDK_Right, isCtrlPressed);
 				break;
 
 			case GdkKeysyms.GDK_0: .. case GdkKeysyms.GDK_9:
@@ -469,12 +470,12 @@ struct GUI
 				break;
 
 			case GdkKeysyms.GDK_z, GdkKeysyms.GDK_Z:
-				if (e.key().state == ModifierType.CONTROL_MASK) actionUndo();
+				if (isCtrlPressed) actionUndo();
 				else actionToggleZoom();
 				break;
 
 			case GdkKeysyms.GDK_y, GdkKeysyms.GDK_Y:
-				if (e.key().state == ModifierType.CONTROL_MASK) actionRedo();
+				if (isCtrlPressed) actionRedo();
 				else actionToggleZoom();
 				break;
 
