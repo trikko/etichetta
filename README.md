@@ -3,19 +3,16 @@
 
 Etichetta is a project that aims to provide a simple and efficient way to annotate images.
 
-<img src="https://github.com/trikko/etichetta/assets/647157/7ab51282-e2ed-435e-b44b-f9073c0df18c" width=480>
+<img src="https://github.com/trikko/etichetta/assets/647157/2e16f5eb-948c-4c92-9041-6cc3f9f15132" width=480>
 
 ## Quick start
 A simple tutorial to start using Etichetta can be found on the [HOWTO](https://github.com/trikko/etichetta/blob/main/HOWTO.md) page.
 
 
 ## Prebuilt packages (Linux, Windows)
-> [!NOTE]
-> The packages are not yet available. You can build and run a preview version of etichetta by following the instructions below.
+[![Snap](https://img.shields.io/badge/-Linux_SNAP_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/etichetta/releases/latest/download/etichetta.snap)
 
-[![Snap](https://img.shields.io/badge/-Linux_SNAP_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/tshare/releases/latest/download/etichetta.snap)
-
-[![Windows](https://img.shields.io/badge/-Windows_installer-blue.svg?style=for-the-badge&logo=windows)](https://github.com/trikko/tshare/releases/latest/download/etichetta-setup.exe)
+[![Windows](https://img.shields.io/badge/-Windows_installer-blue.svg?style=for-the-badge&logo=windows)](https://github.com/trikko/etichetta/releases/latest/download/etichetta-setup.exe)
 
 ## Build from source (Linux, Windows)
 
