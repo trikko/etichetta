@@ -13,9 +13,9 @@ A simple tutorial to start using Etichetta can be found on the [HOWTO](https://g
 > [!NOTE]
 > The packages are not yet available. You can build and run a preview version of etichetta by following the instructions below.
 
-[![Snap](https://img.shields.io/badge/-Linux_SNAP_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/tshare/releases/latest/download/etichetta.snap)
+[![Snap](https://img.shields.io/badge/-Linux_SNAP_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/etichetta/releases/latest/download/etichetta.snap)
 
-[![Windows](https://img.shields.io/badge/-Windows_installer-blue.svg?style=for-the-badge&logo=windows)](https://github.com/trikko/tshare/releases/latest/download/etichetta-setup.exe)
+[![Windows](https://img.shields.io/badge/-Windows_installer-blue.svg?style=for-the-badge&logo=windows)](https://github.com/trikko/etichetta/releases/latest/download/etichetta-setup.exe)
 
 ## Build from source (Linux, Windows)
 
