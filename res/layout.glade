@@ -341,7 +341,6 @@
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can-focus">False</property>
-                        <property name="accel-path">a</property>
                         <property name="label" translatable="yes">Annotate with AI</property>
                         <accelerator key="a" signal="activate"/>
                       </object>
