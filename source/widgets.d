@@ -88,6 +88,6 @@ struct Widgets
    {
       Builder b = new Builder();
 		b.addFromString(LAYOUT);
-		b.bindAll!widgets;
+		b.bindWidgets!widgets;
    }
 }

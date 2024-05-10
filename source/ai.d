@@ -31,7 +31,6 @@ import common;
 
 import dcv.core;
 import dcv.imgproc;
-import dcv.plot;
 import dcv.imageio;
 
 import mir.ndslice, mir.rc;
@@ -172,7 +171,10 @@ struct AI
          ort.SetSessionLogSeverityLevel(session_options, 4);
          ort.SetSessionGraphOptimizationLevel(session_options, GraphOptimizationLevel.ORT_ENABLE_ALL);
          ort.SetSessionExecutionMode(session_options, ExecutionMode.ORT_PARALLEL);
-         ort.CreateSession(env, file.ptr, session_options, &session).validate();
+
+         version(linux)    ort.CreateSession(env, file.ptr, session_options, &session).validate();
+         version(windows)  ort.CreateSession(env, cast(ushort*)file.ptr, session_options, &session).validate();
+         
          sessionCreated = true;
 
          foreach(available; availableExecProviders)

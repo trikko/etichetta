@@ -63,14 +63,18 @@ int mainImpl(string[] args)
 
 	info("Example files written to: ", tmpDir);
 
+	import gtkd.Loader;
+
+	Linker.dumpLoadLibraries();
+	Linker.dumpFailedLoads();
+
 	// Initialize the application
 	Main.init(args);
-
 	AI.reinit();
-	//AI.load("/home/andrea/src/etichetta/yolov8s.onnx");
 
 	Widgets.reinit();
 	GUI.reinit();
+
 	workingDirectory = tmpDir;
 	Picture.reinit();
 
@@ -79,8 +83,14 @@ int mainImpl(string[] args)
 	return 0;
 }
 
-// IGNORED, for now.
 version(Windows)
+{
+	pragma(lib, "user32");
+	pragma(lib, "gdi32");
+}
+
+// IGNORED, for now.
+version(none)
 {
 	pragma(lib, "user32");
 	pragma(lib, "gdi32");

@@ -20,3 +20,4 @@ output/*
 deployment/unpacker
 *.snap
 InstallationLog.txt
+ext/onnx/*

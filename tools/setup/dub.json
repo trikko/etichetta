@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Andrea Fontana"
+	],
+	"copyright": "Copyright © 2024, Andrea Fontana",
+	"description": "Dependencies setup for etichetta",
+	"license": "proprietary",
+	"name": "setup"
+}
