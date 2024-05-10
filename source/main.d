@@ -63,11 +63,6 @@ int mainImpl(string[] args)
 
 	info("Example files written to: ", tmpDir);
 
-	import gtkd.Loader;
-
-	Linker.dumpLoadLibraries();
-	Linker.dumpFailedLoads();
-
 	// Initialize the application
 	Main.init(args);
 	AI.reinit();
@@ -89,8 +84,7 @@ version(Windows)
 	pragma(lib, "gdi32");
 }
 
-// IGNORED, for now.
-version(none)
+version(Windows)
 {
 	pragma(lib, "user32");
 	pragma(lib, "gdi32");

@@ -67,7 +67,7 @@ void main()
          std.file.write(dest, zip.expand(am));
 
          if (name.endsWith(".dll"))
-         std.file.write(buildPath("output", "bin", baseName(name)), zip.expand(am));
+            std.file.write(buildPath("output", "bin", baseName(name)), zip.expand(am));
       }
 
    }
