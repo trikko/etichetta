@@ -7,8 +7,8 @@ void main()
    // Move inside the deployment dir
    chdir(buildPath(dirName(thisExePath), "..", ".."));
 
-   rmdirRecurse("ext/onnx");
-   rmdirRecurse("output/bin");
+   try { rmdirRecurse("ext/onnx"); } catch (Exception e) { }
+   try { rmdirRecurse("output/bin"); } catch (Exception e) { }
 
    string onnxruntime;
 
