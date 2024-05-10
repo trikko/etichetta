@@ -22,7 +22,7 @@ On windows you also need MSBuild package (c/c++ compiler) and Windows SDK.
 Then:
 
 ```
-git checkout https://github.com/trikko/etichetta
+git close https://github.com/trikko/etichetta
 cd etichetta
 dub run :setup
 dub
