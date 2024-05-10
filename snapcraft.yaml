@@ -1,5 +1,5 @@
 name: etichetta
-version: 0.1.1
+version: 0.1.2
 summary: A YOLO annotator, for human beings
 description: |
   Etichetta is a YOLO annotator, for human beings. It allows you to
@@ -12,6 +12,8 @@ icon: snap/gui/etichetta.png
 
 apps:
   etichetta:
+    environment:
+      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAPCRAFT_PART_INSTALL
     command: etichetta
 
 parts:
@@ -20,7 +22,7 @@ parts:
     source-type: git
     plugin: make
     override-build: |
-      dub build --build=release && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
+      dub run :setup && dub build --build=release && mv ext/onnx/libonnx* $SNAPCRAFT_PART_INSTALL && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
     build-packages:
     - build-essential
     - ldc
