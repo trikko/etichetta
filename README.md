@@ -17,10 +17,18 @@ A simple tutorial to start using Etichetta can be found on the [HOWTO](https://g
 ## Build from source (Linux, Windows)
 
 To build etichetta from source install a dlang compiler (DMD, LDC, GDC) from [dlang.org](https://dlang.org)
+On windows you also need MSBuild package (c/c++ compiler) and Windows SDK.
 
- - Checkout this respository `git checkout https://github.com/trikko/etichetta`
- - Follow the instructions on `ext/README.md` to add required dependencies
- - Build the project `dub --build=release`
+Then:
+
+```
+git checkout https://github.com/trikko/etichetta
+cd etichetta
+dub run :setup
+dub
+```
+
+To use GPU acceleration, read `ext/README.md`.
 
 ## Etichetta on macOS (with Docker and XQuartz)
 
