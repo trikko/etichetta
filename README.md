@@ -16,12 +16,11 @@ A simple tutorial to start using Etichetta can be found on the [HOWTO](https://g
 
 ## Build from source (Linux, Windows)
 
-To build etichetta from source install a dlang compiler (DMD, LDC, GDC), checkout this repository and build.
+To build etichetta from source install a dlang compiler (DMD, LDC, GDC) from [dlang.org](https://dlang.org)
 
-```bash
-git clone https://github.com/trikko/etichetta
-dub --build=release
-```
+ - Checkout this respository `git checkout https://github.com/trikko/etichetta`
+ - Follow the instructions on `ext/README.md` to add required dependencies
+ - Build the project `dub --build=release`
 
 ## Etichetta on macOS (with Docker and XQuartz)
 
