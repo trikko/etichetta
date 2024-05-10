@@ -46,12 +46,13 @@ struct Rectangle
 {
 	Point p1 = Point(double.max, double.max);
 	Point p2 = Point(-double.max, -double.max);
-	int label = 1;
+
+	int 	label = 1;
+	float score = float.max;
 }
 
 // Some different colors for the labels
 static immutable defaultLabelColors = [
-	[0, 0.301961, 0.262745],
 	[1.0, 1.0, 0.0],
 	[0.109804, 0.901961, 1],
 	[1, 0.290196, 0.27451],
@@ -82,7 +83,8 @@ static immutable defaultLabelColors = [
 	[1, 0.564706, 0.788235],
 	[0.72549, 0.0117647, 0.666667],
 	[0.819608, 0.380392, 0],
-	[0.866667, 0.937255, 1]
+	[0.866667, 0.937255, 1],
+	[0, 0.301961, 0.262745],
 ];
 
 alias StatusChangeCallback 				= void delegate(State);

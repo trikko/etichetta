@@ -4,16 +4,20 @@
 	],
 	"copyright": "Copyright © 2024, Andrea Fontana",
 	"dependencies": {
-		"gtk-d": "~>3.10.0"
+		"gtk-d": "~>3.10.0",
+		"dcv:core": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147" },
+		"dcv:plot": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147" },
+		"dcv:imageio": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147"}
 	},
 	"description": "A minimal D application.",
 	"license": "MIT",
 	"name": "etichetta",
-	"stringImportPaths": [
-		"res"
-	],
+	"stringImportPaths": [ "res" ],
+	"dflags": [ "-P-Iext/onnx/include", "-L-Lext/onnx/lib"],
+	"libs": ["onnxruntime"],
 	"targetPath": "output/bin",
-	"preGenerateCommands-windows": [
-		"dub run --single deployment/deploy.d"
+	"copyFiles-windows": [
+		"ext/onnx/lib/*",
+		"ext/gtk"
 	]
 }

@@ -96,6 +96,7 @@ struct GUI
 		r.p1 = p1;
 		r.p2 = p2;
 		r.label = label;
+		r.score = float.max;
 		Picture.rects = r ~ Picture.rects;
 
 		Picture.writeAnnotations();
@@ -119,7 +120,7 @@ struct GUI
 			pb.fill(intColorFromIndex(idx));
 			store.setValue(top, 0, pb);
 
-			if (idx < labels.length && idx > 0) store.setValue(top, 1, labels[idx].toUpper);
+			if (idx < labels.length) store.setValue(top, 1, labels[idx].toUpper);
 			else store.setValue(top, 1, "<label not defined>");
 
 			store.setValue(top, 2, idx);
@@ -129,7 +130,7 @@ struct GUI
 
 		store.clear();
 
-		if (text.empty) foreach(idx; 1 .. labels.length) appendFromIndex(idx); // Show all if search is empty
+		if (text.empty) foreach(idx; 0 .. labels.length) appendFromIndex(idx); // Show all if search is empty
 		else if (text.all!isDigit) appendFromIndex(text.to!size_t);	// Show the label if the search is a number
 		else
 		{
@@ -149,8 +150,7 @@ struct GUI
 			Tuple!(size_t, string)[] sortedByLength;
 
 			foreach(idx, label; labels)
-				if (idx > 0)
-					sortedByLength ~= tuple(idx, label.toLower);
+				sortedByLength ~= tuple(idx, label.toLower);
 
 			sortedByLength = sortedByLength.sort!((a, b) => a[1].length < b[1].length).array;
 
@@ -275,6 +275,7 @@ struct GUI
 		if (status == status.EDITING && Picture.rects.length > 0)
 		{
 			Picture.rects[0].label = labelIdx;
+			Picture.rects[0].score = float.max;
 			Picture.writeAnnotations();
 		}
 
@@ -420,6 +421,34 @@ struct GUI
 
 	}
 
+	void actionShowAISettings()
+	{
+		import ai: AI;
+
+		if (!AI.hasAI)
+		{
+			showMissingAIError();
+			return;
+		}
+
+		fileAILabels.setCurrentName(AI.labelsFile);
+		fileAIModel.setCurrentName(AI.modelFile);
+
+		chkAIGpu.setActive = false;
+		btnAIOk.setSensitive(true);
+		btnAIOk.setLabel("Load");
+
+		wndAI.showAll();
+	}
+
+	void showMissingAIError()
+	{
+		import gtk.MessageDialog;
+		auto error = new MessageDialog(mainWindow, DialogFlags.MODAL, MessageType.ERROR, ButtonsType.CLOSE, "I can't load the AI module.\nDo you have the AI library ONNX installed?\n\nPlease check the README.md for more information.");
+		error.setModal(true);
+		error.run();
+		error.destroy();
+	}
 
 
 	// Handle key press events and map them to actions
@@ -431,6 +460,21 @@ struct GUI
 
 		switch (key)
 		{
+			case GdkKeysyms.GDK_a, GdkKeysyms.GDK_A:
+
+				import ai : AI;
+
+				if (status == State.ANNOTATING) break;
+				else if (!AI.hasModel) actionShowAISettings();
+				else
+				{
+					auto airects = AI.boxes(Picture.current);
+					Picture.rects ~= airects;
+					Picture.historyCommit();
+					canvas.queueDraw();
+				}
+
+				break;
 			case GdkKeysyms.GDK_Return:
 				if (status == State.ANNOTATING)
 				{
@@ -604,18 +648,21 @@ struct GUI
 				w.stroke();
 
 				// Draw a small label under the rect
-				if (r.label > 0 && r.label < labels.length)
+				if (r.label < labels.length)
 				{
+					string text = labels[r.label];
+					if (r.score != float.max)
+						text ~= format(" (%2.2f%%)", 100*r.score);
 
 					cairo_text_extents_t te;
 					w.setFontSize(10);
-					w.textExtents(labels[r.label], &te);
-					w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, te.height + 4);
+					w.textExtents(text, &te);
+					w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, 18);
 					w.fill();
 
 					w.setSourceRgba(0,0,0, 0.8);
-					w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 18);
-					w.showText(labels[r.label]);
+					w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 8 + te.height + (18 - te.height) / 2);
+					w.showText(text);
 				}
 
 
@@ -685,17 +732,17 @@ struct GUI
 			}
 
 			// Draw a small label under the rect
-			if (points.length > 1 && label > 0 && label < labels.length)
+			if (points.length > 1 && label < labels.length)
 			{
 				cairo_text_extents_t te;
 				w.setFontSize(10);
 				w.textExtents(labels[label], &te);
-				w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, te.height + 4);
+				w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, 18);
 				w.fill();
 
 				w.setSourceRgba(0,0,0, 0.8);
 				w.setFontSize(10);
-				w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 18);
+				w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 8 + te.height + (18 - te.height) / 2);
 				w.showText(labels[label]);
 			}
 
@@ -784,6 +831,7 @@ struct GUI
 
 				Picture.rects[0].p1 = p1;
 				Picture.rects[0].p2 = p2;
+				Picture.rects[0].score = float.max;
 
 				bool isOutside = p1.x == p2.x || p1.y == p2.y;
 
@@ -1099,7 +1147,7 @@ struct GUI
 		if (!exists(file))
 			return false;
 
-		labels = [""] ~ readText(file).splitter("\n").filter!(a => a.length > 0).map!(x => x.strip).array;
+		labels = readText(file).splitter("\n").filter!(a => a.length > 0).map!(x => x.strip).array;
 		return true;
 	}
 
@@ -1126,6 +1174,80 @@ struct GUI
 		imgLogo.setFromPixbuf(logo);
 		btnWebsite.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://github.com/trikko/etichetta", 0); return true; } );
 		btnDonate.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://www.paypal.me/andreafontana/5", 0); return true; } );
+
+		wndAI.addOnDelete( (Event e, Widget w){ wndAI.hide(); return true; } );
+
+		btnAICancel.addOnButtonPress( (Event e, Widget w){ wndAI.hide(); return true; } );
+		btnAIOk.addOnButtonPress( (Event e, Widget w){
+			import ai: AI;
+			import gtk.MessageDialog;
+
+			auto model = fileAIModel.getFile().getPath();
+			auto labels = fileAILabels.getFile().getPath();
+
+			// Check if user selected a model file and a labels file
+			if (model.empty || labels.empty)
+			{
+				// Show a warning in a messagebox
+				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Please select a model and a labels file");
+				dialog.setModal(true);
+				dialog.run();
+				dialog.destroy();
+
+				return true;
+			}
+
+			btnAIOk.setSensitive(false);
+			btnAIOk.setLabel("Loading...");
+
+			scope(exit)
+			{
+				btnAIOk.setSensitive(true);
+				btnAIOk.setLabel("Load");
+			}
+
+			// Load the model and the labels
+			if(!AI.load(model, labels, chkAIGpu.getActive?AI.availableExecProviders[0][0]:"CPU"))
+			{
+				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Error loading the model.\nPlease check the files and try again.");
+				dialog.setModal(true);
+				dialog.run();
+				dialog.destroy();
+				return true;
+			}
+
+			// Check labels match between AI.labels and GUI.labels
+
+			int[string] guiLabels;
+			foreach(idx, l; GUI.labels)
+				guiLabels[l] = cast(int)idx;
+
+			AI.labelsMap = null;
+
+			foreach(idx, l; AI.labels)
+			{
+				if (l in guiLabels)
+				{
+					assert(GUI.labels[guiLabels[l]] == l);
+					AI.labelsMap[cast(int)idx] = guiLabels[l];
+					debug info("Matching label (AI -> GUI): ", l, "(", idx ,") -> ",  GUI.labels[guiLabels[l]], "(", guiLabels[l], ")");
+				}
+			}
+
+			if(AI.labelsMap.empty)
+			{
+				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "No labels match between the AI labels and the project labels.\nPlease check the files and try again.");
+				dialog.setModal(true);
+				dialog.run();
+				dialog.destroy();
+				return true;
+			}
+
+			mnuAuto.setSensitive(true);
+
+			wndAI.hide();
+			return true;
+		} );
 
 		// Bind events
 		canvas.addOnDraw(toDelegate(&onDraw));
@@ -1165,8 +1287,10 @@ struct GUI
 		mnuAbout.addOnButtonPress( (Event e, Widget w){ wndAbout.showAll(); return true; } );
 		mnuTutorial.addOnButtonPress( (Event e, Widget w){ mainWindow.showUriOnWindow(mainWindow, "https://github.com/trikko/etichetta/blob/main/HOWTO.md", 0); return true; } );
 
+		mnuAI.addOnButtonPress( (Event e, Widget w){ actionShowAISettings(); return true; } );
+
 		readLabels();
-		addWorkingDirectoryChangeCallback( (dir) { readLabels(); } );
+		addWorkingDirectoryChangeCallback( (dir) { mnuAuto.setSensitive(false); readLabels(); } );
 
 		lstLabels.addOnRowActivated( (path, col, tv) {
 

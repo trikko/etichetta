@@ -34,6 +34,7 @@ import gtk.Main;
 import gui : GUI;
 import picture : Picture;
 import widgets : Widgets;
+import ai : AI;
 
 import common;
 
@@ -64,10 +65,15 @@ int mainImpl(string[] args)
 
 	// Initialize the application
 	Main.init(args);
+
+	AI.reinit();
+	//AI.load("/home/andrea/src/etichetta/yolov8s.onnx");
+
 	Widgets.reinit();
 	GUI.reinit();
 	workingDirectory = tmpDir;
 	Picture.reinit();
+
 	Main.run();
 
 	return 0;

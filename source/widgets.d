@@ -29,14 +29,15 @@ import imports : LAYOUT;
 import gtkattributes;
 import gtk.Button;
 
-import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button,
-   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image;
+import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton,
+   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton;
 
 mixin GtkAttributes;
 
 @ui Window   		   wndLabels;
 @ui Dialog           wndAbout;
 @ui Window   		   mainWindow;
+@ui Dialog           wndAI;
 
 @ui DrawingArea	   canvas;
 
@@ -64,9 +65,19 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuAbout;
 @ui MenuItem         mnuTutorial;
 
+@ui MenuItem         mnuAuto;
+@ui MenuItem         mnuAI;
+
+@ui Button           btnAICancel;
+@ui Button           btnAIOk;
 @ui Button           btnWebsite;
 @ui Button           btnDonate;
 @ui Image            imgLogo;
+
+@ui FileChooserButton fileAIModel;
+@ui FileChooserButton fileAILabels;
+
+@ui CheckButton      chkAIGpu;
 
 @ui Entry			   search;
 @ui TreeView		   lstLabels;

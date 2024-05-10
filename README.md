@@ -27,7 +27,7 @@ dub --build=release
 
 I do not have access to any machine with macOS and therefore it is difficult to perform the necessary tests for development. Anyway to try etichetta on a macOS machine, you can run it inside a Docker container and connect a display, using XQuartz.
 
-You can use the scripts inside the folder `deployment`.
+You can use the scripts inside the folder `macos-docker`.
 
 Build the last docker image running `./build-docker-etichetta.sh` and run it using `./run-docker-etichetta.sh`
 
