@@ -22,7 +22,7 @@ parts:
     source-type: git
     plugin: make
     override-build: |
-      dub run :setup && dub build --build=release && mv ext/onnx/libonnx* $SNAPCRAFT_PART_INSTALL && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
+      dub run :setup && dub build --build=release && mv ext/onnx/lib/libonnx* $SNAPCRAFT_PART_INSTALL && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
     build-packages:
     - build-essential
     - ldc
