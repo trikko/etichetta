@@ -7,9 +7,11 @@ void main()
    // Move inside the deployment dir
    chdir(buildPath(dirName(thisExePath), "..", ".."));
 
-   writeln(getcwd);
+   rmdirRecurse("ext/onnx");
+   rmdirRecurse("output/bin");
+
    string onnxruntime;
-   
+
    version(Windows)
    {
       // Extract file "window-redist" inside "windows" folder if not already extracted
@@ -52,7 +54,7 @@ void main()
 
       foreach (string name, ArchiveMember am; zip.directory)
       {
-         
+
          auto dest = buildPath("ext", name).replace("onnxruntime-win-x64-1.17.3", "onnx");
          auto dir = dirName(dest);
 
@@ -69,12 +71,11 @@ void main()
       }
 
    }
-   else 
+   else
    {
-      // ~
-      executeShell("tar xf " ~ tmpDownloadPath ~ "ext/ && mv etx/onnx* ext/onnx" );
+      executeShell("tar xf " ~ tmpDownloadPath ~ " -C ext/ && mv ext/onnx* ext/onnx" );
       info(" * Installing runtime");
-      executeShell("sudo cp etc/onnx/lib/libonnxruntime_* /usr/local/lib && sudo cp etc/onnx/lib/libonnxruntime.1.* /usr/local/lib");
+      executeShell("sudo cp ext/onnx/lib/libonnxruntime_* /usr/local/lib ; sudo cp ext/onnx/lib/libonnxruntime.so.1.* /usr/local/lib ; sudo ldconfig");
    }
 
    info("DONE!");
