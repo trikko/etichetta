@@ -22,4 +22,4 @@ chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
 cp ../output/bin/etichetta AppDir/usr/bin/
 
 # Run the build
-DEPLOY_GTK_VERSION=3 ./linuxdeploy-x86_64.AppImage --plugin gtk -i ../res/etichetta.svg -d ../res/etichetta.desktop  --library=/usr/lib/x86_64-linux-gnu/libphobos2.so --appdir=AppDir --output appimage
+DEPLOY_GTK_VERSION=3 ./linuxdeploy-x86_64.AppImage --plugin gtk -i ../res/etichetta.svg -d ../res/etichetta.desktop --appdir=AppDir --output appimage
