@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ windows-2022 ]
-        dc: [ ldc-1.34.1 ]
+        dc: [ ldc-1.34.0 ]
         arch: [ x86_64 ]
         
     runs-on: ${{ matrix.os }}
