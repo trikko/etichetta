@@ -27,27 +27,27 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
-
-    - uses: actions/checkout@v4
+    
     - name: Install D compiler
       uses: dlang-community/setup-dlang@v1
       with:
         compiler: ${{ matrix.dc }}
         
-    - name: 'Build & Test'
+    - name: Build
       run: |
-        # Build the project, with its main file included, without unittests
         dub run :setup
         dub build
 
     - name: Inno Setup Action
-      # You may pin to the exact commit or the version.
-      # uses: Minionguyjpro/Inno-Setup-Action@0aa2e2f0ff0885d9a036b4c12521d46784d31647
       uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
       with:
-        # Path to input .iss script file
         path: etichetta.iss 
-        # Extra arguments/options to include. Include the slashes for them.
-        #options: # optional
+        options: /VERYSILENT /Fetichetta-setup 
+        
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: innosetup-exe
+        path: etichetta-setup.exe
           
         
