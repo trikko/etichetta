@@ -4,6 +4,6 @@
 	],
 	"copyright": "Copyright © 2024, Andrea Fontana",
 	"description": "Dependencies setup for etichetta",
-	"license": "proprietary",
+	"license": "MIT",
 	"name": "setup"
 }
