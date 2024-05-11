@@ -1157,6 +1157,8 @@ struct GUI
 
 	void reinit()
 	{
+		import std.process : browse;
+
 		static Pixbuf logo = null;
 
 		if (logo is null)
@@ -1176,8 +1178,8 @@ struct GUI
 		wndAbout.setIcon(logo);
 		wndAbout.addOnDelete( (Event e, Widget w){ wndAbout.hide(); return true; } );
 		imgLogo.setFromPixbuf(logo);
-		btnWebsite.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://github.com/trikko/etichetta", 0); return true; } );
-		btnDonate.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://www.paypal.me/andreafontana/5", 0); return true; } );
+		btnWebsite.addOnButtonPress( (Event e, Widget w){ browse("https://github.com/trikko/etichetta"); return false; } );
+		btnDonate.addOnButtonPress( (Event e, Widget w){ browse("https://www.paypal.me/andreafontana/5"); return false; } );
 
 		wndAI.setIcon(logo);
 		wndAI.addOnDelete( (Event e, Widget w){ wndAI.hide(); return true; } );
@@ -1292,7 +1294,7 @@ struct GUI
 		mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
 
 		mnuAbout.addOnButtonPress( (Event e, Widget w){ wndAbout.showAll(); return true; } );
-		mnuTutorial.addOnButtonPress( (Event e, Widget w){ mainWindow.showUriOnWindow(mainWindow, "https://github.com/trikko/etichetta/blob/main/HOWTO.md", 0); return true; } );
+		mnuTutorial.addOnButtonPress( (Event e, Widget w){ browse("https://github.com/trikko/etichetta/blob/main/HOWTO.md"); return true; } );
 
 		mnuAI.addOnButtonPress( (Event e, Widget w){ actionShowAISettings(); return true; } );
 
