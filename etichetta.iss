@@ -11,7 +11,7 @@ LicenseFile=LICENSE
 
 
 [Files]
-Source: "output\bin\*.*"; DestDir: "{app}\bin";  Excludes: "*.pbd*; Flags: recursesubdirs
+Source: "output\bin\*.*"; DestDir: "{app}\bin";  Excludes: "*.pdb,*.obj"; Flags: recursesubdirs
 Source: "output\etc\*.*"; DestDir: "{app}\etc"; Flags: recursesubdirs
 Source: "output\share\*.*"; DestDir: "{app}\share"; Flags: recursesubdirs
 Source: "output\lib\*.*"; DestDir: "{app}\lib"; Flags: recursesubdirs
