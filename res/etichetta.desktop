@@ -1,0 +1,11 @@
+[Desktop Entry]
+
+Type=Application
+Version=1.0
+Name=etichetta
+Comment=A YOLO annotator, for human beings
+Exec=etichetta
+Icon=etichetta
+Terminal=false
+
+Categories=Development;Education;Utility;

@@ -1170,11 +1170,13 @@ struct GUI
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
 
+		wndAbout.setIcon(logo);
 		wndAbout.addOnDelete( (Event e, Widget w){ wndAbout.hide(); return true; } );
 		imgLogo.setFromPixbuf(logo);
 		btnWebsite.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://github.com/trikko/etichetta", 0); return true; } );
 		btnDonate.addOnButtonPress( (Event e, Widget w){ wndAbout.showUriOnWindow(wndAbout, "https://www.paypal.me/andreafontana/5", 0); return true; } );
 
+		wndAI.setIcon(logo);
 		wndAI.addOnDelete( (Event e, Widget w){ wndAI.hide(); return true; } );
 
 		btnAICancel.addOnButtonPress( (Event e, Widget w){ wndAI.hide(); return true; } );

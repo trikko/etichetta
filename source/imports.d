@@ -29,4 +29,4 @@ immutable static LAYOUT    = import("layout.glade");
 immutable static LABELS    = import("labels/example_a.txt");
 immutable static CLASSES   = import("classes.txt");
 immutable static EXAMPLES  = [ import("images/example_a.jpg"), import("images/example_b.jpg") ];
-immutable static LOGO      = import("logo.svg");
+immutable static LOGO      = import("etichetta.svg");
