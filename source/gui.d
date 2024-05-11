@@ -1247,7 +1247,6 @@ struct GUI
 				dialog.setModal(true);
 				dialog.run();
 				dialog.destroy();
-				return true;
 			}
 
 			mnuAuto.setSensitive(true);
