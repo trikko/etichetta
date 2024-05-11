@@ -26,7 +26,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
 
     - name: Install D compiler
       uses: dlang-community/setup-dlang@v1
@@ -41,12 +40,7 @@ jobs:
       run: |
         dub run :setup
         dub build
-
-    - name: Inno Setup Action
-      uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
-      with:
-        path: etichetta.iss 
-        options: /VERYSILENT /Fetichetta-setup 
+        iscc etichetta.iss /VERYSILENT /Fetichetta-setup /O+
         
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4
