@@ -29,8 +29,9 @@ import imports : LAYOUT;
 import gtkattributes;
 import gtk.Button;
 
-import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton,
+import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton, gtk.Adjustment,
    gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton;
+   import gtk.Adjustment;
 
 mixin GtkAttributes;
 
@@ -45,6 +46,9 @@ mixin GtkAttributes;
 
 @ui CheckMenuItem		mnuZoomOnExit;
 @ui CheckMenuItem		mnuGuides;
+
+@ui Adjustment       adjOverlapping;
+@ui Adjustment       adjConfidence;
 
 @ui MenuItem		   mnuExit;
 @ui MenuItem		   mnuOpen;

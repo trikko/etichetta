@@ -438,6 +438,8 @@ struct GUI
 		btnAIOk.setSensitive(true);
 		btnAIOk.setLabel("Load");
 
+		adjConfidence.setValue(60);
+		adjOverlapping.setValue(90);
 		wndAI.showAll();
 	}
 
@@ -1247,6 +1249,8 @@ struct GUI
 
 			mnuAuto.setSensitive(true);
 
+			AI.minConfidence = adjConfidence.getValue() / 100;
+			AI.maxOverlapping = adjOverlapping.getValue() / 100;
 			wndAI.hide();
 			return true;
 		} );

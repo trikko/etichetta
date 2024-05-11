@@ -56,6 +56,9 @@ struct AI
    size_t inputW;
    size_t inputH;
 
+   double minConfidence;
+   double maxOverlapping;
+
    ExecutionProvider[] availableExecProviders;
 
    private
@@ -174,7 +177,7 @@ struct AI
 
          version(linux)    ort.CreateSession(env, file.ptr, session_options, &session).validate();
          version(windows)  ort.CreateSession(env, cast(ushort*)file.ptr, session_options, &session).validate();
-         
+
          sessionCreated = true;
 
          foreach(available; availableExecProviders)
@@ -277,7 +280,7 @@ struct AI
          auto maxClassLoc = classProbabilities.maxIndex[0];
          auto maxScore = classProbabilities[maxClassLoc];
 
-         if (maxScore > 0.50f) {
+         if (maxScore > minConfidence) {
 
             // We don't have this class in the gui
             if (cast(int)maxClassLoc !in labelsMap)
@@ -326,8 +329,8 @@ struct AI
                // Are they the same box?
                if (
                   b.label == candidate.label &&
-                  leftX/intersectX < 0.1 && rightX/intersectX < 0.1 &&
-                  leftY/intersectY < 0.1 && rightY/intersectY < 0.1
+                  leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
+                  leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
                )
                {
                   if(b.score < candidate.score)
@@ -345,7 +348,6 @@ struct AI
          }
       }
 
-      info("Objects detected with unknown class: ", unknown);
       return boxes[Picture.rects.length..$];
    }
 

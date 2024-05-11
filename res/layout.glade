@@ -2,6 +2,21 @@
 <!-- Generated with glade 3.38.2 -->
 <interface>
   <requires lib="gtk+" version="3.24"/>
+  <object class="GtkAdjustment" id="adjConfidence">
+    <property name="lower">50</property>
+    <property name="upper">101</property>
+    <property name="value">60</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+    <property name="page-size">1</property>
+  </object>
+  <object class="GtkAdjustment" id="adjOverlapping">
+    <property name="upper">101</property>
+    <property name="value">90</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+    <property name="page-size">1</property>
+  </object>
   <object class="GtkFileFilter" id="filterONNX">
     <patterns>
       <pattern>*.onnx</pattern>
@@ -201,6 +216,76 @@
                 <property name="expand">False</property>
                 <property name="fill">False</property>
                 <property name="position">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">Min confidence (%)</property>
+                <attributes>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkScale" id="lvlConfidence">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="margin-bottom">20</property>
+                <property name="adjustment">adjConfidence</property>
+                <property name="lower-stepper-sensitivity">on</property>
+                <property name="upper-stepper-sensitivity">on</property>
+                <property name="show-fill-level">True</property>
+                <property name="fill-level">100</property>
+                <property name="round-digits">0</property>
+                <property name="digits">0</property>
+                <property name="value-pos">right</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">5</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">Max overlapping (%)</property>
+                <attributes>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">6</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkScale" id="lvlOverlapping">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="margin-bottom">10</property>
+                <property name="adjustment">adjOverlapping</property>
+                <property name="lower-stepper-sensitivity">on</property>
+                <property name="upper-stepper-sensitivity">on</property>
+                <property name="show-fill-level">True</property>
+                <property name="fill-level">100</property>
+                <property name="round-digits">0</property>
+                <property name="digits">0</property>
+                <property name="value-pos">right</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">7</property>
               </packing>
             </child>
           </object>
