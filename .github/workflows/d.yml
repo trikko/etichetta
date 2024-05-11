@@ -1,0 +1,41 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+name: D
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dlang-community/setup-dlang@4c99aa991ce7d19dd3064de0a4f2f6b2f152e2d7
+
+    - name: 'Build & Test'
+      run: |
+        # Build the project, with its main file included, without unittests
+        dub run :setup
+        dub build --compiler=ldc
+
+    - name: Inno Setup Action
+      # You may pin to the exact commit or the version.
+      # uses: Minionguyjpro/Inno-Setup-Action@0aa2e2f0ff0885d9a036b4c12521d46784d31647
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
+      with:
+        # Path to input .iss script file
+        path: etichetta.iss 
+        # Extra arguments/options to include. Include the slashes for them.
+        #options: # optional
+          
+        
