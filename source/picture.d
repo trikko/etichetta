@@ -206,10 +206,14 @@ struct Picture
 			if (index < 0) index = list.length - 1;
 			else if (index >= list.length) index = 0;
 
-			loadCurrent();
+			if (toAnnotate)
+				readAnnotations();
 
 			if (!toAnnotate || Picture.rects.length == 0)
+			{
+				loadCurrent();
 				break;
+			}
 
 			if (index == curIndex)
 				break;
