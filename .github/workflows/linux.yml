@@ -18,10 +18,10 @@ jobs:
 
     strategy:
       matrix:
-        os: [ windows-2022 ]
-        dc: [ dmd-latest ]
+        os: [ ubuntu-20.04 ]
+        dc: [ ldc-latest ]
         arch: [ x86_64 ]
-        
+
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -32,20 +32,17 @@ jobs:
       with:
         compiler: ${{ matrix.dc }}
 
-    - uses: TheMrMilchmann/setup-msvc-dev@v3
-      with:
-        arch: x64
-        
     - name: Build
       run: |
         dub run :setup
-        dub build --build=release --build-mode=singleFile --parallel
-        iscc etichetta.iss /VERYSILENT /Fetichetta-setup /O+
-        
+        dub build --build=release
+        cd appimage
+        ./appimage-build.sh
+
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: innosetup-exe
-        path: ./Output/etichetta-setup.exe
-          
-        
+        name: appimage
+        path: ./appimage/etichetta-x86_64.AppImage
+
+

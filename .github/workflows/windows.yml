@@ -1,0 +1,51 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+name: D
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        os: [ windows-2022 ]
+        dc: [ dmd-latest ]
+        arch: [ x86_64 ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install D compiler
+      uses: dlang-community/setup-dlang@v1
+      with:
+        compiler: ${{ matrix.dc }}
+
+    - uses: TheMrMilchmann/setup-msvc-dev@v3
+      with:
+        arch: x64
+
+    - name: Build
+      run: |
+        dub run :setup
+        dub build --build=plain
+        iscc etichetta.iss /VERYSILENT /Fetichetta-setup /O+
+
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: innosetup-exe
+        path: ./Output/etichetta-setup.exe
+
+
