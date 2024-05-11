@@ -62,7 +62,7 @@ struct GUI
 
 	Point				lastMouseCoords;
 	Point[] 			points;
-	int				label = 1;
+	int				label = 0;
 
 	Rectangle calculateBoundingBox(in Point[] points)
 	{

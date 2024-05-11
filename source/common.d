@@ -47,7 +47,7 @@ struct Rectangle
 	Point p1 = Point(double.max, double.max);
 	Point p2 = Point(-double.max, -double.max);
 
-	int 	label = 1;
+	int 	label = 0;
 	float score = float.max;
 }
 
