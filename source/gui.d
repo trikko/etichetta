@@ -262,8 +262,9 @@ struct GUI
 
 	void actionPictureCycling(bool forward, bool toAnnotate = false)
 	{
-		isGrabbing = false;
 		confirmAnnotation();
+		actionEditingMode();
+
 		if (forward) Picture.next(toAnnotate);
 		else Picture.prev(toAnnotate);
 	}
