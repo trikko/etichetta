@@ -32,7 +32,7 @@ jobs:
       run: |
         # Build the project, with its main file included, without unittests
         dub run :setup
-        dub build --compiler=ldc
+        dub build
 
     - name: Inno Setup Action
       # You may pin to the exact commit or the version.
