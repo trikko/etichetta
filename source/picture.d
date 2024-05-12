@@ -302,7 +302,7 @@ struct Picture
 			auto w = r.p2.x - r.p1.x;
 			auto h = r.p2.y - r.p1.y;
 
-			auto line = format("%d %.20f %.20f %.20f %.20f", r.label, cx, cy, w, h);
+			auto line = format("%d %.6f %.6 %.6f %.6f", r.label, cx, cy, w, h);
 			f.writeln(line);
 		}
 
