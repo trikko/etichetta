@@ -32,6 +32,7 @@ import gtk.Button;
 import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton, gtk.Adjustment,
    gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton;
    import gtk.Adjustment;
+   import gtk.ProgressBar;
 
 mixin GtkAttributes;
 
@@ -39,6 +40,13 @@ mixin GtkAttributes;
 @ui Dialog           wndAbout;
 @ui Window   		   mainWindow;
 @ui Dialog           wndAI;
+@ui Window           wndResize;
+
+@ui ProgressBar      pbResize;
+@ui Button           btnResizeCancel;
+@ui Button           btnResize;
+@ui FileChooserButton fileImagesDir;
+@ui Entry            maxImageDimension;
 
 @ui DrawingArea	   canvas;
 
@@ -71,6 +79,8 @@ mixin GtkAttributes;
 
 @ui MenuItem         mnuAuto;
 @ui MenuItem         mnuAI;
+
+@ui MenuItem         mnuResize;
 
 @ui Button           btnAICancel;
 @ui Button           btnAIOk;

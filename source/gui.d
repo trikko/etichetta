@@ -37,11 +37,13 @@ import gdk.Cursor, gdk.Event, gdk.Keysyms, gdk.Pixbuf;
 import gdk.Cairo : setSourcePixbuf;
 
 import cairo.Context;
+import gdk.Atom;
 
 struct GUI
 {
 	static:
 
+	__gshared bool		cancelResize = true;
 	TreeStore			store;
 
 	string[]			labels;
@@ -515,6 +517,9 @@ struct GUI
 				search.setText("");
 				actionSearchLabel("");
 				wndLabels.showAll();
+				break;
+			case GdkKeysyms.GDK_w, GdkKeysyms.GDK_W:
+				if (isCtrlPressed) Picture.writeAnnotations();
 				break;
 
 			case GdkKeysyms.GDK_z, GdkKeysyms.GDK_Z:
@@ -1176,6 +1181,114 @@ struct GUI
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
 
+		wndResize.setIcon(logo);
+		wndResize.addOnDelete( (Event e, Widget w){ wndResize.hide(); return true; } );
+		btnResizeCancel.addOnButtonPress( (Event e, Widget w){ btnResize.setSensitive = true; cancelResize = true; wndResize.hide(); return true; } );
+
+		btnResize.addOnButtonPress( (Event e, Widget w){
+
+			import core.thread;
+			auto folder = (fileImagesDir.getFile)? fileImagesDir.getFile.getPath : "";
+			int size = 0;
+
+			try {size = std.conv.to!int(maxImageDimension.getText);} catch(Exception e) { size = 0; }
+
+			if (folder.empty || size == 0)
+			{
+				import gtk.MessageDialog;
+				auto dialog = new MessageDialog(wndResize, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Please select a folder and a size");
+				dialog.setModal(true);
+				dialog.run();
+				dialog.destroy();
+				return true;
+			}
+			else
+			{
+				btnResize.setSensitive = false;
+				cancelResize = false;
+				new Thread({
+					import glib.Idle;
+
+					extern(C) int resize (void* data)
+					{
+						double fraction = *(cast(double*)data);
+
+						if (fraction < 0) wndResize.hide();
+						else pbResize.setFraction(fraction);
+						return 0;
+					}
+
+					auto newFolder = buildPath(folder, "..", folder.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
+					auto entries = dirEntries(folder, "*.{jpg,jpeg,png}", SpanMode.shallow).array;
+
+					double rp = 0;
+
+					if (entries.length > 0)
+					{
+
+						try {mkdirRecurse(newFolder);} catch(Exception e) { }
+
+						foreach(idx, f; entries)
+						{
+							if (cancelResize)
+							{
+								warning("Resize cancelled");
+								break;
+							}
+
+							Pixbuf p = new Pixbuf(f.name);
+
+							// Letterbox scaling into size*size square
+							auto ratio = cast(float)p.getWidth / p.getHeight;
+							auto newWidth = size;
+							auto newHeight = size;
+
+							if (ratio > 1) newHeight = cast(int)(size / ratio);
+							else newWidth = cast(int)(size * ratio);
+
+							auto newPixbuf = p.scaleSimple(newWidth, newHeight, InterpType.BILINEAR);
+
+							try {
+								string ext;
+								string[] keys;
+								string[] values;
+
+								if (f.name.extension == ".png")
+								{
+									ext = "png";
+									keys = ["compression"];
+									values = ["9"];
+								}
+								else
+								{
+									ext = "jpeg";
+									keys = ["quality"];
+									values = ["100"];
+								}
+
+								newPixbuf.savev(std.conv.to!string(buildPath(newFolder, f.name.baseName).asNormalizedPath), ext, keys, values);
+							}
+							catch(Exception e ) { warning("Can't save ", f.name, " to ", newFolder, ". Exception: ", e.msg); }
+
+							destroy(newPixbuf);
+							destroy(p);
+
+							rp = 1.0*idx/entries.length;
+
+							Idle.add(&resize, &rp);
+						}
+
+						rp = -1;
+						Idle.add(&resize, &rp);
+						Thread.sleep(1000.msecs);
+					}
+				}).start();
+			}
+
+			return true;
+		} );
+
+
 		wndAbout.setIcon(logo);
 		wndAbout.addOnDelete( (Event e, Widget w){ wndAbout.hide(); return true; } );
 		imgLogo.setFromPixbuf(logo);
@@ -1267,6 +1380,7 @@ struct GUI
 		mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
+		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; wndResize.showAll(); return true; }); // Resize images
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 
