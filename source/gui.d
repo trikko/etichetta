@@ -1380,7 +1380,7 @@ struct GUI
 		mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
-		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; wndResize.showAll(); return true; }); // Resize images
+		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; fileImagesDir.setCurrentName(""); pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 
