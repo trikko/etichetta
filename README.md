@@ -10,7 +10,7 @@ A simple tutorial to start using Etichetta can be found on the [HOWTO](https://g
 
 
 ## Prebuilt packages (Linux, Windows)
-[![Snap](https://img.shields.io/badge/-Linux_AppImage_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/etichetta/releases/latest/download/etichetta.AppImage)
+[![Snap](https://img.shields.io/badge/-Linux_AppImage_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/etichetta/releases/latest/download/etichetta-x86_64.AppImage)
 
 [![Windows](https://img.shields.io/badge/-Windows_installer-blue.svg?style=for-the-badge&logo=windows)](https://github.com/trikko/etichetta/releases/latest/download/etichetta-setup.exe)
 
