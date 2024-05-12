@@ -459,7 +459,7 @@ struct GUI
 	{
 
 		uint key = e.key().keyval;
-		bool isCtrlPressed = e.key().state == ModifierType.CONTROL_MASK || e.key().state == cast(GdkModifierType)268435472;
+		bool isCtrlPressed = ((e.key().state & ModifierType.CONTROL_MASK) == ModifierType.CONTROL_MASK) || ((e.key().state & cast(GdkModifierType)268435472) == cast(GdkModifierType)268435472);
 
 		switch (key)
 		{
