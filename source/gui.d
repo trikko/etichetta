@@ -474,7 +474,7 @@ struct GUI
 					auto airects = AI.boxes(Picture.current);
 					Picture.rects ~= airects;
 					Picture.historyCommit();
-					confirmAnnotation();
+					Picture.writeAnnotations();
 					canvas.queueDraw();
 				}
 

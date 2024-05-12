@@ -250,11 +250,19 @@ struct AI
       assert(hasAI);
 
       import mir.algorithm.iteration : minIndex, maxIndex;
+      import picture : Picture;
 
       assert(session !is null);
 
-      Image img = imread(file);
-      scope(exit) destroyFree(img);
+      Image img = new Image(
+         Picture.width,
+         Picture.height,
+         ImageFormat.IF_RGB,
+         BitDepth.BD_8,
+         cast(ubyte[])Picture.pixbuf.getPixelsWithLength()
+      );
+
+      scope(exit) destroy(img);
 
       Slice!(ubyte*, 3) imSlice = img.sliced; // will be freed with the previous destroyFree(img)
 
