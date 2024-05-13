@@ -29,7 +29,7 @@ import imports : LAYOUT;
 import gtkattributes;
 import gtk.Button;
 
-import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton, gtk.Adjustment,
+import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton, gtk.Adjustment, gtk.Label,
    gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton;
    import gtk.Adjustment;
    import gtk.ProgressBar;
@@ -37,6 +37,7 @@ import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.But
 mixin GtkAttributes;
 
 @ui Window   		   wndLabels;
+@ui Window   		   wndExtract;
 @ui Dialog           wndAbout;
 @ui Window   		   mainWindow;
 @ui Dialog           wndAI;
@@ -47,6 +48,13 @@ mixin GtkAttributes;
 @ui Button           btnResize;
 @ui FileChooserButton fileImagesDir;
 @ui Entry            maxImageDimension;
+
+@ui Label            lblProgress;
+@ui Button           btnExtractCancel;
+@ui Button           btnExtract;
+@ui FileChooserButton fileVideo;
+@ui Entry            maxFrameDimension;
+@ui Entry            frameInterval;
 
 @ui DrawingArea	   canvas;
 
@@ -76,6 +84,7 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuSetCurrentLabel;
 @ui MenuItem		   mnuAbout;
 @ui MenuItem         mnuTutorial;
+@ui MenuItem         mnuExtract;
 
 @ui MenuItem         mnuAuto;
 @ui MenuItem         mnuAI;

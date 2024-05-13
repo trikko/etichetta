@@ -38,12 +38,16 @@ import gdk.Cairo : setSourcePixbuf;
 
 import cairo.Context;
 import gdk.Atom;
+import core.sys.posix.libgen;
+import core.int128;
 
 struct GUI
 {
 	static:
 
 	__gshared bool		cancelResize = true;
+	__gshared bool		cancelExtract = true;
+
 	TreeStore			store;
 
 	string[]			labels;
@@ -1242,8 +1246,50 @@ struct GUI
 		mainWindow.addOnDelete( (Event e, Widget w){ Main.quit(); return true; } );
 		mainWindow.showAll();
 
+		wndExtract.setIcon(logo);
+		wndExtract.addOnDelete( (Event e, Widget w){ btnExtract.setSensitive = true; cancelExtract = true; wndExtract.hide(); return true; } );
+		btnExtractCancel.addOnButtonPress( (Event e, Widget w){ btnExtract.setSensitive = true; cancelExtract = true; wndExtract.hide(); return true; } );
+		btnExtract.addOnButtonPress( (Event e, Widget w){
+			import core.thread;
+			auto video = fileVideo.getFile? fileVideo.getFile.getPath : "";
+			int size;
+			int interval;
+
+			try {size = std.conv.to!int(maxImageDimension.getText);} catch(Exception e) { size = 0; }
+			try {interval = std.conv.to!int(frameInterval.getText);} catch(Exception e) { interval = 0; }
+
+			if (video.empty || size == 0 || interval == 0)
+			{
+				import gtk.MessageDialog;
+				auto dialog = new MessageDialog(wndExtract, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Please select a video file, a size and an interval");
+				dialog.setModal(true);
+				dialog.run();
+				dialog.destroy();
+				return true;
+			}
+			else
+			{
+				btnExtract.setSensitive = false;
+				cancelExtract = false;
+
+				new Thread({
+					import glib.Idle;
+
+					auto outputDir = buildPath(dirName(video), video.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
+
+					auto res = extractFrames(video, outputDir, interval, size);
+					Idle.add(&extractResult, &res);
+
+					Thread.sleep(500.msecs);
+				}).start();
+			}
+
+			return true;
+		});
+
+
 		wndResize.setIcon(logo);
-		wndResize.addOnDelete( (Event e, Widget w){ wndResize.hide(); return true; } );
+		wndResize.addOnDelete( (Event e, Widget w){ btnResize.setSensitive = true; cancelResize = true; wndResize.hide(); return true; } );
 		btnResizeCancel.addOnButtonPress( (Event e, Widget w){ btnResize.setSensitive = true; cancelResize = true; wndResize.hide(); return true; } );
 
 		btnResize.addOnButtonPress( (Event e, Widget w){
@@ -1441,6 +1487,8 @@ struct GUI
 		mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
+
+		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; fileVideo.setCurrentName(""); wndExtract.showAll(); lblProgress.setVisible(false); return true; }); // Resize images
 		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; fileImagesDir.setCurrentName(""); pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
@@ -1604,4 +1652,111 @@ struct GUI
 
 		pencil = new Cursor(CursorType.PENCIL);
 	}
+
+	enum FfmpegError
+	{
+		NO_ERROR,
+		FFMPEG_NOT_FOUND,
+		FFMPEG_INPUT_FILE_NOT_FOUND,
+		FFMPEG_ERROR,
+		FFMPEG_KILLED
+	}
+
+	extern(C) int extractProgress(void* processed)
+	{
+		if (lblProgress.getVisible == false)
+			lblProgress.showAll();
+
+		auto t = (*(cast(ulong*)processed)).seconds.to!string;
+		lblProgress.setText("Processed: " ~ t);
+		return 0;
+	}
+
+	extern(C) int extractResult(void* result)
+	{
+		auto r = *(cast(FfmpegError*)result);
+
+		if (r == FfmpegError.FFMPEG_KILLED) { return 0; }
+		else if (r == FfmpegError.NO_ERROR) wndExtract.hide();
+		else
+		{
+			string msg;
+			switch(r)
+			{
+				case FfmpegError.FFMPEG_NOT_FOUND: msg = "Can't find ffmpeg. Is it installed?"; break;
+				case FfmpegError.FFMPEG_INPUT_FILE_NOT_FOUND: msg = "Input video not found"; break;
+				case FfmpegError.FFMPEG_ERROR: msg = "Internal ffmpeg decoding error."; break;
+				default: msg = "Unknown error"; break;
+			}
+			import gtk.MessageDialog;
+			auto dialog = new MessageDialog(wndExtract, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Error extracting frames from video.\n" ~ msg);
+			dialog.setModal(true);
+			dialog.run();
+			dialog.destroy();
+		}
+		return 0;
+	}
+
+	FfmpegError extractFrames(string videoPath, string outputDir, ulong delayMs, ulong maxDimension)
+	{
+		cancelExtract = false;
+
+		// Check if ffmpeg exists
+		if (executeShell("ffmpeg -progress - -h").status != 0)
+			return FfmpegError.FFMPEG_NOT_FOUND;
+
+		if (exists(videoPath) == false)
+			return FfmpegError.FFMPEG_INPUT_FILE_NOT_FOUND;
+
+		try { mkdirRecurse(outputDir); } catch (Exception e) { }
+
+		if (outputDir.length > 0 && outputDir[outputDir.length - 1] == '/')
+			outputDir = outputDir[0..outputDir.length - 1];
+
+
+		auto cmd = format("ffmpeg -y -v quiet -stats -progress - -i %s -r %.8f -vf scale=w=%s:h=%s:force_original_aspect_ratio=decrease -qscale:v 2 %s/frame%%06d.jpg",
+			videoPath,
+			1.0f/(delayMs/1000.0f),
+			maxDimension,
+			maxDimension,
+			outputDir
+		);
+
+		auto pipe = pipeProcess(cmd.split(" "));
+
+		while(true)
+		{
+			if (cancelExtract)
+			{
+				pipe.stderr.close();
+				pipe.stdin.close();
+				pipe.stdout.close();
+				pipe.pid.kill();
+
+				return FfmpegError.FFMPEG_KILLED;
+			}
+
+			auto line = pipe.stdout.readln('\n');
+			if (line.length == 0) break;
+
+			if (line.canFind("out_time="))
+			{
+				auto parts = line.split("=");
+				auto time = parts[1].strip().split(".")[0].split(":");
+
+				auto processed = time[0].to!ulong*60*60 + time[1].to!ulong*60 + time[2].to!ulong;
+
+				if(processed > 0)
+				{
+					import glib.Idle;
+					Idle.add(&extractProgress, &processed);
+				}
+			}
+		}
+
+		int rc = pipe.pid.wait();
+		if (rc != 0) return FfmpegError.FFMPEG_ERROR;
+		else return FfmpegError.NO_ERROR;
+	}
+
 }

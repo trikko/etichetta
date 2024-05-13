@@ -5,20 +5,19 @@
 	"copyright": "Copyright © 2024, Andrea Fontana",
 	"dependencies": {
 		"gtk-d": "~>3.10.0",
-		"dcv:core": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147" },
-		"dcv:imageio": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147"}
+		"dcv:core": { "repository": "git+https://github.com/libmir/dcv", "version": "51c1147" }
 	},
-	"description": "A minimal D application.",
+	"description": "A YOLO annotator, for human beings",
 	"license": "MIT",
 	"name": "etichetta",
 	"stringImportPaths": [ "res" ],
-	
+
 	"dflags-linux": [ "-P-Iext/onnx/include", "-L-Lext/onnx/lib"],
 	"libs-linux" : ["onnxruntime"],
-	
+
 	"dflags-windows": [ "-P-Iext/onnx/include"],
 	"libs-windows": ["${PACKAGE_DIR}/ext/onnx/lib/onnxruntime"],
-	
+
 	"targetPath": "output/bin",
 	"copyFiles-windows": [ "ext/onnx/lib/*" ],
 

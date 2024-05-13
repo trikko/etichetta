@@ -30,8 +30,6 @@ import onnxruntime;
 import common;
 
 import dcv.core;
-import dcv.imgproc;
-import dcv.imageio;
 
 import mir.ndslice, mir.rc;
 import mir.appender;
@@ -254,20 +252,9 @@ struct AI
 
       import mir.algorithm.iteration : minIndex, maxIndex;
       import picture : Picture;
-
       assert(session !is null);
 
-      Image img = new Image(
-         Picture.width,
-         Picture.height,
-         ImageFormat.IF_RGB,
-         BitDepth.BD_8,
-         cast(ubyte[])Picture.pixbuf.getPixelsWithLength()
-      );
-
-      scope(exit) destroy(img);
-
-      Slice!(ubyte*, 3) imSlice = img.sliced; // will be freed with the previous destroyFree(img)
+      Slice!(ubyte*, 3) imSlice = (cast(ubyte[])Picture.pixbuf.getPixelsWithLength()).sliced(Picture.height, Picture.width, 3);
 
       float scale;
       auto impr = letterBoxAndPreprocess(imSlice, scale);//preprocess(imSlice);
@@ -420,7 +407,7 @@ struct AI
 
    Slice!(RCI!float, 3) letterBoxAndPreprocess(InputSlice)(InputSlice img, out float scale){
       import std.algorithm.comparison : min;
-
+      import dcv.imgproc : resize;
       static assert(InputSlice.N == 3, "only RGB color images are supported");
 
       size_t w = inputW;
