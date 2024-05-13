@@ -8,7 +8,7 @@ Etichetta is a project that aims to provide a simple and efficient way to annota
 <sup>You can download [here](https://www.printables.com/@AndreaFontana) those 3d printed models.</sup>
 
 ## Quick start
-A simple tutorial to start using Etichetta can be found on the [HOWTO](https://github.com/trikko/etichetta/blob/main/HOWTO.md) page.
+Some simple tutorials to start using Etichetta can be found on the [HOWTO](https://github.com/trikko/etichetta/blob/main/HOWTO.md) page and [AI](https://github.com/trikko/etichetta/blob/main/AI.md) page.
 
 ## Prebuilt packages (Linux, Windows)
 [![Snap](https://img.shields.io/badge/-Linux_AppImage_-red.svg?style=for-the-badge&logo=linux)](https://github.com/trikko/etichetta/releases/latest/download/etichetta-x86_64.AppImage)
