@@ -29,4 +29,4 @@ In this way, returning to the photos to be labeled and pressing the `A` key, all
 <img src="https://github.com/trikko/etichetta/assets/647157/efde7eb3-e4ea-4cfd-8f7a-fb41e377fb2e" width="480">
 <img src="https://github.com/trikko/etichetta/assets/647157/5a9ff296-58bb-4850-b625-1fc74b67793e" width="480">
 
-Now all I have to do is simply adjust the proposed frame and press the `0` or `1` key to choose the right class. A nice difference compared to making all the rectangles from scratch!
+Now all I have to do is simply adjust the proposed frame and press the `0` or `1` key to choose the right class (you see? the cat in the second photo is Goose). A nice difference compared to making all the rectangles from scratch!
