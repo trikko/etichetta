@@ -55,6 +55,7 @@ struct GUI
 	Point[] 			zoomLines;
 	bool				isZooming = false;
 
+	bool isAIrunning = false;
 	bool isGrabbing = false;
 	bool showGuides = false;
 	int  grabIndex = -1;
@@ -73,6 +74,7 @@ struct GUI
 	Rectangle[]		copyBuffer;
 	Rectangle[]		cloneBuffer;
 
+	string 			lastDirectory;
 
 	Rectangle calculateBoundingBox(in Point[] points)
 	{
@@ -234,6 +236,7 @@ struct GUI
 		// Let user choose a directory
 		auto dialog = new FileChooserDialog("Choose a directory", mainWindow, FileChooserAction.SELECT_FOLDER, ["Cancel", "Open"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
 		dialog.setModal(true);
+		dialog.setCurrentFolder(lastDirectory);
 		dialog.setTransientFor(mainWindow);
 		dialog.setSelectMultiple(false);
 
@@ -257,6 +260,8 @@ struct GUI
 				resetZoom();
 
 			workingDirectory = dialog.getFilename;
+			resetCurrentDirectory(workingDirectory);
+
 		}
 
 		return true;
@@ -538,11 +543,9 @@ struct GUI
 				else if (!AI.hasModel) actionShowAISettings();
 				else
 				{
-					auto airects = AI.boxes(Picture.current);
-					Picture.rects ~= airects;
-					Picture.historyCommit();
-					Picture.writeAnnotations();
+					isAIrunning = true;
 					canvas.queueDraw();
+					AI.boxes(Picture.current);
 				}
 
 				break;
@@ -844,6 +847,14 @@ struct GUI
 
 			}
 
+		}
+
+		if(isAIrunning)
+		{
+			// Draw a green circle on top left
+			w.setSourceRgba(0.3,0.3,0.8,0.7);
+			w.arc(15, 15, 8, 0, 2*PI);
+			w.fill();
 		}
 
 		return true;
@@ -1225,10 +1236,19 @@ struct GUI
 		return true;
 	}
 
+	void resetCurrentDirectory(string s)
+	{
+		lastDirectory = s;
+		fileAILabels.setCurrentFolder(s);
+		fileAIModel.setCurrentFolder(s);
+		fileVideo.setCurrentFolder(s);
+	}
 
 	void reinit()
 	{
 		import std.process : browse;
+
+		resetCurrentDirectory(getcwd());
 
 		static Pixbuf logo = null;
 
@@ -1240,6 +1260,11 @@ struct GUI
 			logo = new Pixbuf(tmpLogo);
 			remove(tmpLogo);
 		}
+
+		fileAILabels.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
+		fileAIModel.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
+		fileImagesDir.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
+		fileVideo.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
 
 		mainWindow.setIcon(logo);
 		mainWindow.setTitle("Etichetta " ~ VERSION_STRING ~ " - GitHub: trikko/etichetta");

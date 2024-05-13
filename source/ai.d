@@ -35,13 +35,14 @@ import mir.ndslice, mir.rc;
 import mir.appender;
 
 import common : Rectangle, Point;
+import glib.Idle;
 
 alias ProviderFunc = extern (C) OrtStatus* function(OrtSessionOptions* options, int device_id);
 alias ExecutionProvider = Tuple!(string, ProviderFunc);
 
 struct AI
 {
-   static:
+   static __gshared:
 
    bool hasAI = false;
    bool hasModel() { return modelFile.length > 0 && labelsFile.length > 0; };
@@ -246,7 +247,34 @@ struct AI
       return true;
    }
 
-   Rectangle[] boxes(string file)
+   struct BoxesResult
+   {
+      Rectangle[] boxes;
+      size_t      pictureIdx;
+   }
+
+   extern(C) int boxesResult(void *results)
+   {
+      import picture : Picture;
+      import widgets : canvas;
+
+      BoxesResult res = *(cast(BoxesResult*)results);
+
+      if (Picture.index == res.pictureIdx)
+      {
+         Picture.rects = res.boxes.dup;
+         Picture.historyCommit();
+         Picture.writeAnnotations();
+      }
+
+      import gui : GUI;
+      GUI.isAIrunning = false;
+		canvas.queueDraw();
+
+      return 0;
+   }
+
+   void boxes(string file)
    {
       assert(hasAI);
 
@@ -259,94 +287,107 @@ struct AI
       float scale;
       auto impr = letterBoxAndPreprocess(imSlice, scale);//preprocess(imSlice);
 
-      scope float* outPtr;
-      long[3] outDims;
-      size_t numberOfelements;
-
-      infer(impr, outPtr, outDims, numberOfelements);
-
-      scope Slice!(float*, 3) outSlice = outPtr[0..numberOfelements].sliced(outDims[0], outDims[1], outDims[2]);
+      import core.thread;
+      import glib.Idle;
 
       import picture : Picture;
       Rectangle[] boxes = Picture.rects.dup;
 
-      size_t unknown = 0;
+      new Thread({
 
-      foreach (i; 0 .. outSlice.shape[2]) {
-         auto classProbabilities = outSlice[0, 4 .. $, i];
+         scope float* outPtr;
+         long[3] outDims;
+         size_t numberOfelements;
 
-         auto maxClassLoc = classProbabilities.maxIndex[0];
-         auto maxScore = classProbabilities[maxClassLoc];
+         infer(impr, outPtr, outDims, numberOfelements);
+         scope Slice!(float*, 3) outSlice = outPtr[0..numberOfelements].sliced(outDims[0], outDims[1], outDims[2]);
 
-         if (maxScore > minConfidence) {
+         size_t unknown = 0;
 
-            // We don't have this class in the gui
-            if (cast(int)maxClassLoc !in labelsMap)
-            {
-               unknown++;
-               continue;
-            }
+         foreach (i; 0 .. outSlice.shape[2]) {
+            auto classProbabilities = outSlice[0, 4 .. $, i];
 
-            // Object detected with confidence higher than the threshold
-            // Extract bounding box coordinates
-            auto width = outSlice[0, 2, i]  ;
-            auto height = outSlice[0, 3, i] ;
+            auto maxClassLoc = classProbabilities.maxIndex[0];
+            auto maxScore = classProbabilities[maxClassLoc];
 
-            auto x = outSlice[0, 0, i] - 0.5f * width;
-            auto y = outSlice[0, 1, i] - 0.5f * height;
+            if (maxScore > minConfidence) {
 
-            // only one scale value is enough with a letterbox image.
-            auto candidate = Rectangle(Point(x/scale/imSlice.shape[1], y/scale/imSlice.shape[0]), Point((x+width)/scale/imSlice.shape[1], (y+height)/scale/imSlice.shape[0]), labelsMap[cast(int)maxClassLoc], maxScore);
-
-            bool toAdd = true;
-
-            string matches;
-            foreach(idx, b; boxes)
-            {
-               // Check if candidate and b intersect
-
-               bool intersect = (
-                  !(candidate.p2.x < b.p1.x || candidate.p1.x > b.p2.x) &&
-                  !(candidate.p2.y < b.p1.y || candidate.p1.y > b.p2.y)
-               );
-
-               if (!intersect)
-                  continue;
-
-               auto allx = [b.p1.x, b.p2.x, candidate.p1.x, candidate.p2.x].sort;
-               auto ally = [b.p1.y, b.p2.y, candidate.p1.y, candidate.p2.y].sort;
-
-               auto leftX = allx[1] - allx[0];
-               auto intersectX = allx[2] - allx[1];
-               auto rightX = allx[3] - allx[2];
-
-               auto leftY = ally[1] - ally[0];
-               auto intersectY = ally[2] - ally[1];
-               auto rightY = ally[3] - ally[2];
-
-               // Are they the same box?
-               if (
-                  b.label == candidate.label &&
-                  leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
-                  leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
-               )
+               // We don't have this class in the gui
+               if (cast(int)maxClassLoc !in labelsMap)
                {
-                  if(b.score < candidate.score)
-                        boxes[idx] = candidate;
-
-                  toAdd = false;
-                  break;
+                  unknown++;
+                  continue;
                }
 
+               // Object detected with confidence higher than the threshold
+               // Extract bounding box coordinates
+               auto width = outSlice[0, 2, i]  ;
+               auto height = outSlice[0, 3, i] ;
+
+               auto x = outSlice[0, 0, i] - 0.5f * width;
+               auto y = outSlice[0, 1, i] - 0.5f * height;
+
+               // only one scale value is enough with a letterbox image.
+               auto candidate = Rectangle(Point(x/scale/imSlice.shape[1], y/scale/imSlice.shape[0]), Point((x+width)/scale/imSlice.shape[1], (y+height)/scale/imSlice.shape[0]), labelsMap[cast(int)maxClassLoc], maxScore);
+
+               bool toAdd = true;
+
+               string matches;
+               foreach(idx, b; boxes)
+               {
+                  // Check if candidate and b intersect
+
+                  bool intersect = (
+                     !(candidate.p2.x < b.p1.x || candidate.p1.x > b.p2.x) &&
+                     !(candidate.p2.y < b.p1.y || candidate.p1.y > b.p2.y)
+                  );
+
+                  if (!intersect)
+                     continue;
+
+                  auto allx = [b.p1.x, b.p2.x, candidate.p1.x, candidate.p2.x].sort;
+                  auto ally = [b.p1.y, b.p2.y, candidate.p1.y, candidate.p2.y].sort;
+
+                  auto leftX = allx[1] - allx[0];
+                  auto intersectX = allx[2] - allx[1];
+                  auto rightX = allx[3] - allx[2];
+
+                  auto leftY = ally[1] - ally[0];
+                  auto intersectY = ally[2] - ally[1];
+                  auto rightY = ally[3] - ally[2];
+
+                  // Are they the same box?
+                  if (
+                     b.label == candidate.label &&
+                     leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
+                     leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
+                  )
+                  {
+                     if(b.score < candidate.score)
+                           boxes[idx] = candidate;
+
+                     toAdd = false;
+                     break;
+                  }
+
+               }
+
+               if (toAdd)
+                  boxes ~= candidate;
+
             }
-
-            if (toAdd)
-               boxes ~= candidate;
-
          }
-      }
 
-      return boxes[Picture.rects.length..$];
+         BoxesResult res;
+         res.boxes = boxes;
+         res.pictureIdx = Picture.index;
+
+         Idle.add(&boxesResult, &res);
+
+         Thread.sleep(100.msecs);
+
+      }).start();
+      return;
    }
 
    private void infer(InputSlice)(auto ref InputSlice impr, out float* outPtr, out long[3] outDims, out size_t ecount0)
