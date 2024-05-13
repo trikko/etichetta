@@ -55,7 +55,6 @@ struct GUI
 	Point[] 			zoomLines;
 	bool				isZooming = false;
 
-	bool isAIrunning = false;
 	bool isGrabbing = false;
 	bool showGuides = false;
 	int  grabIndex = -1;
@@ -540,9 +539,10 @@ struct GUI
 				else if (!AI.hasModel) actionShowAISettings();
 				else
 				{
-					isAIrunning = true;
+					AI.boxes();
+					Picture.historyCommit();
+					Picture.writeAnnotations();
 					canvas.queueDraw();
-					AI.boxes(Picture.current);
 				}
 
 				break;
@@ -844,14 +844,6 @@ struct GUI
 
 			}
 
-		}
-
-		if(isAIrunning)
-		{
-			// Draw a green circle on top left
-			w.setSourceRgba(0.3,0.3,0.8,0.7);
-			w.arc(15, 15, 8, 0, 2*PI);
-			w.fill();
 		}
 
 		return true;
