@@ -315,7 +315,7 @@ struct Picture
 	{
 		list.length = 0;
 
-		foreach(f; dirEntries(buildPath(workingDirectory, "images"), SpanMode.shallow))
+		foreach(f; dirEntries(buildPath(workingDirectory, "images"), SpanMode.shallow).array.sort!((a,b) => a.name < b.name))
 		{
 			auto ext = extension(f).toLower();
 			if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
