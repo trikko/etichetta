@@ -1,7 +1,7 @@
 ## Use pretrained AI as assistant
-Many people have asked me what the purpose is and how to use AI with labeling. The goal is to simplify the annotation of images by leveraging an AI that has already been pre-trained.
+Many people have asked me what the purpose is and how to use AI with Etichetta. The goal is to simplify the annotation of images by leveraging an AI that has already been pre-trained.
 
-For simplicity, let’s assume we want to create an AI capable of distinguishing my cat (“goose”) from other cats (“non_goose”). Below is a photo of Goose that I manually annotated using a label.
+For simplicity, let’s assume we want to create an AI capable of distinguishing my cat (“goose”) from other cats (“non_goose”). Below is a photo of Goose that I manually annotated using Etichetta.
 
 ![goose](https://github.com/trikko/etichetta/assets/647157/d06c1b0a-15d9-4700-8cb4-3614d463e5f8)
 
