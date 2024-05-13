@@ -254,17 +254,7 @@ struct AI
 
       assert(session !is null);
 
-      Image img = new Image(
-         Picture.width,
-         Picture.height,
-         ImageFormat.IF_RGB,
-         BitDepth.BD_8,
-         cast(ubyte[])Picture.pixbuf.getPixelsWithLength()
-      );
-
-      scope(exit) destroy(img);
-
-      Slice!(ubyte*, 3) imSlice = img.sliced; // will be freed with the previous destroyFree(img)
+      Slice!(ubyte*, 3) imSlice = (cast(ubyte[])Picture.pixbuf.getPixelsWithLength()).sliced(Picture.height, Picture.width, 3);
 
       float scale;
       auto impr = letterBoxAndPreprocess(imSlice, scale);//preprocess(imSlice);
