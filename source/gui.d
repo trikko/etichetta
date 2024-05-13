@@ -448,9 +448,6 @@ struct GUI
 			return;
 		}
 
-		fileAILabels.setCurrentName(AI.labelsFile);
-		fileAIModel.setCurrentName(AI.modelFile);
-
 		chkAIGpu.setActive = false;
 		btnAIOk.setSensitive(true);
 		btnAIOk.setLabel("Load");
@@ -1513,8 +1510,8 @@ struct GUI
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
 
-		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; fileVideo.setCurrentName(""); wndExtract.showAll(); lblProgress.setVisible(false); return true; }); // Resize images
-		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; fileImagesDir.setCurrentName(""); pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
+		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; wndExtract.showAll(); lblProgress.setVisible(false); return true; }); // Resize images
+		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 
