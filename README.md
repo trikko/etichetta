@@ -3,7 +3,7 @@
 
 Etichetta is a project that aims to provide a simple and efficient way to annotate images.
 
-<img src="https://github.com/trikko/etichetta/assets/647157/09be6f08-d9e8-420a-aeee-2fed69fe6c61" width=480>
+<img src="https://github.com/trikko/etichetta/assets/647157/25e85b05-6c46-47ad-aa1c-b0656f1e710f" width=480>
 
 <sup>You can download [here](https://www.printables.com/@AndreaFontana) those 3d printed models.</sup>
 
