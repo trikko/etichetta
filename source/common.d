@@ -27,7 +27,7 @@ module common;
 
 import std.algorithm : each;
 
-immutable VERSION_STRING = "v0.1.3";
+immutable VERSION_STRING = "v0.1.4";
 
 enum State
 {
