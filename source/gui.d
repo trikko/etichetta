@@ -66,6 +66,10 @@ struct GUI
 	Point[] 			points;
 	int				label = 0;
 
+	Rectangle[]		copyBuffer;
+	Rectangle[]		cloneBuffer;
+
+
 	Rectangle calculateBoundingBox(in Point[] points)
 	{
 		Rectangle r;
@@ -266,6 +270,7 @@ struct GUI
 	{
 		confirmAnnotation();
 		actionEditingMode();
+		cloneBuffer = Picture.rects.dup;
 
 		if (forward) Picture.next(toAnnotate);
 		else Picture.prev(toAnnotate);
@@ -446,6 +451,44 @@ struct GUI
 		wndAI.showAll();
 	}
 
+	void actionCopy()
+	{
+		if (status != State.EDITING)
+			return;
+
+		if (Picture.rects.length > 0) copyBuffer = Picture.rects[0..1].dup;
+		else copyBuffer.length = 0;
+	}
+
+	void actionCopyAll()
+	{
+		if (status != State.EDITING)
+			return;
+
+		copyBuffer = Picture.rects.dup;
+	}
+
+	void actionPaste()
+	{
+		if (status != State.EDITING || copyBuffer.length == 0)
+			return;
+
+		Picture.rects ~= copyBuffer;
+
+		Picture.writeAnnotations();
+		canvas.queueDraw();
+	}
+
+	void actionCloneLast()
+	{
+		if (status != State.EDITING || cloneBuffer.length == 0)
+			return;
+
+		Picture.rects ~= cloneBuffer;
+		Picture.writeAnnotations();
+		canvas.queueDraw();
+	}
+
 	void showMissingAIError()
 	{
 		import gtk.MessageDialog;
@@ -461,10 +504,28 @@ struct GUI
 	{
 
 		uint key = e.key().keyval;
+
 		bool isCtrlPressed = ((e.key().state & ModifierType.CONTROL_MASK) == ModifierType.CONTROL_MASK) || ((e.key().state & cast(GdkModifierType)268435472) == cast(GdkModifierType)268435472);
+		bool isShiftPressed = ((e.key().state & ModifierType.SHIFT_MASK) == ModifierType.SHIFT_MASK);
 
 		switch (key)
 		{
+			case GdkKeysyms.GDK_c, GdkKeysyms.GDK_C:
+				if (isCtrlPressed)
+				{
+					if (isShiftPressed) actionCopyAll();
+					else actionCopy();
+				}
+				break;
+
+			case GdkKeysyms.GDK_v, GdkKeysyms.GDK_V:
+				if (isCtrlPressed)
+				{
+					if (isShiftPressed) actionCloneLast();
+					else actionPaste();
+				}
+				break;
+
 			case GdkKeysyms.GDK_a, GdkKeysyms.GDK_A:
 
 				import ai : AI;
@@ -1411,6 +1472,11 @@ struct GUI
 		mnuTutorial.addOnButtonPress( (Event e, Widget w){ browse("https://github.com/trikko/etichetta/blob/main/HOWTO.md"); return true; } );
 
 		mnuAI.addOnButtonPress( (Event e, Widget w){ actionShowAISettings(); return true; } );
+
+		mnuCopy.addOnButtonPress( (Event e, Widget w){ actionCopy(); return true; } );
+		mnuCopyAll.addOnButtonPress( (Event e, Widget w){ actionCopyAll(); return true; } );
+		mnuPaste.addOnButtonPress( (Event e, Widget w){ actionPaste(); return true; } );
+		mnuCloneLast.addOnButtonPress( (Event e, Widget w){ actionCloneLast(); return true; } );
 
 		readLabels();
 		addWorkingDirectoryChangeCallback( (dir) { mnuAuto.setSensitive(false); readLabels(); } );

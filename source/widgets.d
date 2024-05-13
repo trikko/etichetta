@@ -82,6 +82,11 @@ mixin GtkAttributes;
 
 @ui MenuItem         mnuResize;
 
+@ui MenuItem         mnuCopyAll;
+@ui MenuItem         mnuCopy;
+@ui MenuItem         mnuPaste;
+@ui MenuItem         mnuCloneLast;
+
 @ui Button           btnAICancel;
 @ui Button           btnAIOk;
 @ui Button           btnWebsite;

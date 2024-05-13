@@ -157,6 +157,8 @@ struct AI
       assert(hasAI);
       modelFile = "";
 
+      import std.string : toStringz;
+
       OrtSessionOptions* session_options;
       bool sessionCreated = false;
 
@@ -175,8 +177,8 @@ struct AI
          ort.SetSessionGraphOptimizationLevel(session_options, GraphOptimizationLevel.ORT_ENABLE_ALL);
          ort.SetSessionExecutionMode(session_options, ExecutionMode.ORT_PARALLEL);
 
-         version(linux)    ort.CreateSession(env, file.ptr, session_options, &session).validate();
-         version(windows)  ort.CreateSession(env, cast(ushort*)file.ptr, session_options, &session).validate();
+         version(linux)    ort.CreateSession(env, file.toStringz, session_options, &session).validate();
+         version(windows)  ort.CreateSession(env, cast(ushort*)file.toStringz, session_options, &session).validate();
 
          sessionCreated = true;
 
@@ -195,6 +197,7 @@ struct AI
       }
       catch (Exception e)
       {
+         info("Error loading model: ", e.msg);
          if (sessionCreated) ort.ReleaseSession(session);
          return false;
       }
