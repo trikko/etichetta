@@ -35,9 +35,11 @@ To use GPU acceleration, read `ext/README.md`.
 
 I do not have access to any machine with macOS and therefore it is difficult to perform the necessary tests for development. Anyway to try etichetta on a macOS machine, you can run it inside a Docker container and connect a display, using XQuartz.
 
-You can use the scripts inside the folder `macos-docker`.
-
-Build the last docker image running `./build-docker-etichetta.sh` and run it using `./run-docker-etichetta.sh`
+- Install XQuartz, which you can find at this URL: https://www.xquartz.org/index.html  
+- After installation, go to XQuartz preferences: **XQuartz > Preferences > Security** and enable the option "Allow connections from network clients."  
+- Then, run the following command in the terminal: `xhost + 127.0.0.1`
+- Build the last docker image running `./build-docker-etichetta.sh` inside the `macos-docker` folder.
+- Run `./run-docker-etichetta.sh`
 
 ## License
 
