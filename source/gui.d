@@ -452,7 +452,7 @@ struct GUI
 		btnAIOk.setLabel("Load");
 
 		adjConfidence.setValue(60);
-		adjOverlapping.setValue(90);
+		adjOverlapping.setValue(50);
 		wndAI.showAll();
 	}
 
