@@ -48,3 +48,27 @@ To export a model with [Ultralytics](https://docs.ultralytics.com/modes/export/)
 ```bash
 yolo export model=yolo11s.pt format=onnx
 ```
+
+## Train your own model
+Once you have annotated some images, you can train a model on them and use it to annotate the rest. `tools/train.py` does everything starting from your Etichetta project folder: it splits the images in training and validation sets, trains a YOLO model with [Ultralytics](https://docs.ultralytics.com) and exports it to ONNX.
+
+```bash
+pip install ultralytics
+python tools/train.py path/to/my-project
+```
+
+At the end the script prints where `model.onnx` and `labels.txt` are (inside `my-project/models/`): load them from `Edit > AI settings...`.
+
+Useful options (`--help` lists them all):
+
+| Option | Default | |
+|---|---|---|
+| `--model` | `yolo11n.pt` | starting model: `yolo11s.pt`, `yolo11m.pt`... are more accurate and slower. You can also pass a `.pt` you trained before |
+| `--epochs` | `100` | training epochs. Training stops earlier if it doesn't improve for `--patience` epochs |
+| `--imgsz` | `640` | image size used by the model |
+| `--batch` | `16` | lower it if you run out of memory |
+| `--device` | GPU if available | `cpu`, `0` for the first GPU, `mps` on Apple Silicon |
+| `--val` | `0.2` | fraction of images used for validation |
+| `--include-unlabeled` | off | use images without annotations as background |
+
+Training on a CPU works but is slow: with a GPU it is many times faster.
