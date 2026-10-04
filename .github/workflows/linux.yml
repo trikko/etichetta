@@ -35,11 +35,8 @@ jobs:
     - name: Build
       env:
         APPIMAGE_EXTRACT_AND_RUN: 1
-      run: |
-        dub run :setup
-        dub build --build=release
-        cd appimage
-        ./appimage-build.sh
+      # The script runs the setup and the build itself
+      run: ./appimage/appimage-build.sh
 
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4

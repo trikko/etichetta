@@ -1,12 +1,16 @@
 [Setup]
+; AppId must never change, or new versions would install side by side with the old ones.
+; Old installers had no AppId, so Inno Setup used AppName: keep that value.
+AppId=Etichetta
 AppName=Etichetta
 AppVersion=0.1.6
-DefaultDirName={pf}\etichetta
+DefaultDirName={autopf}\etichetta
 DefaultGroupName=etichetta
 UninstallDisplayIcon={app}\etichetta.ico
 Compression=lzma2
 SolidCompression=yes
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=LICENSE
 
 

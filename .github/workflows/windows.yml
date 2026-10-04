@@ -39,7 +39,7 @@ jobs:
     - name: Build
       run: |
         dub run :setup
-        dub build --build=plain
+        dub build --build=release
         iscc etichetta.iss /VERYSILENT /Fetichetta-setup /O+
 
     - name: Archive production artifacts

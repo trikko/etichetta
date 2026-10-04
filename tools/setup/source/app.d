@@ -1,10 +1,15 @@
 module setup;
 
 import std;
+import core.stdc.stdlib : exit;
 
 // onnxruntime and its WebGPU plugin (GPU acceleration through Vulkan, Direct3D 12 or Metal)
 immutable ORT_VERSION = "1.30.0";
-immutable WEBGPU_WHEEL_LINUX = "https://files.pythonhosted.org/packages/c1/96/2a18a45079250afcd825687aef2895de266d5abc1cff9f52d2dede7598f2/onnxruntime_ep_webgpu-0.4.0-py3-none-manylinux_2_28_x86_64.whl";
+immutable WEBGPU_WHEEL_LINUX_X64 = "https://files.pythonhosted.org/packages/c1/96/2a18a45079250afcd825687aef2895de266d5abc1cff9f52d2dede7598f2/onnxruntime_ep_webgpu-0.4.0-py3-none-manylinux_2_28_x86_64.whl";
+immutable WEBGPU_WHEEL_LINUX_AARCH64 = "https://files.pythonhosted.org/packages/4e/ca/00c70322c19913c81a6bb2239aca83781b97a818b55c2ec3d25cec72dc4c/onnxruntime_ep_webgpu-0.4.0-py3-none-manylinux_2_28_aarch64.whl";
+
+version(AArch64) immutable LINUX_ARCH = "aarch64";
+else immutable LINUX_ARCH = "x64";
 immutable WEBGPU_WHEEL_WINDOWS = "https://files.pythonhosted.org/packages/d7/a4/c98a9e9433b3eeb576977b26c5c1cd0364f15ba9d198bb16101e7563ab06/onnxruntime_ep_webgpu-0.4.0-py3-none-win_amd64.whl";
 
 void main()
@@ -45,7 +50,7 @@ void main()
 
       onnxruntime = "https://github.com/microsoft/onnxruntime/releases/download/v" ~ ORT_VERSION ~ "/onnxruntime-win-x64-" ~ ORT_VERSION ~ ".zip";
    }
-   else onnxruntime = "https://github.com/microsoft/onnxruntime/releases/download/v" ~ ORT_VERSION ~ "/onnxruntime-linux-x64-" ~ ORT_VERSION ~ ".tgz";
+   else onnxruntime = "https://github.com/microsoft/onnxruntime/releases/download/v" ~ ORT_VERSION ~ "/onnxruntime-linux-" ~ LINUX_ARCH ~ "-" ~ ORT_VERSION ~ ".tgz";
 
    info(" * Downloading onnx");
    auto tmpDownloadPath = buildPath(tempDir, "etichetta-deps-onnx");
@@ -79,10 +84,21 @@ void main()
    }
    else
    {
-      executeShell("tar xf " ~ tmpDownloadPath ~ " -C ext/ && mv ext/onnx* ext/onnx" );
-      installWebGPU(WEBGPU_WHEEL_LINUX, [buildPath("ext", "onnx", "lib")]);
-      info(" * Installing runtime");
-      executeShell("sudo cp ext/onnx/lib/libonnxruntime_* /usr/local/lib ; sudo cp ext/onnx/lib/libonnxruntime.so.1.* /usr/local/lib ; sudo ldconfig");
+      mkdirRecurse("ext");
+
+      auto tar = execute(["tar", "xf", tmpDownloadPath, "-C", "ext"]);
+      if (tar.status != 0)
+      {
+         error("Can't unpack onnxruntime: ", tar.output);
+         exit(1);
+      }
+
+      rename(buildPath("ext", "onnxruntime-linux-" ~ LINUX_ARCH ~ "-" ~ ORT_VERSION), buildPath("ext", "onnx"));
+
+      version(AArch64) installWebGPU(WEBGPU_WHEEL_LINUX_AARCH64, [buildPath("ext", "onnx", "lib")]);
+      else installWebGPU(WEBGPU_WHEEL_LINUX_X64, [buildPath("ext", "onnx", "lib")]);
+
+      // Nothing to install system-wide: the binary finds ext/onnx/lib through its rpath (see dub.json)
    }
 
    info("DONE!");

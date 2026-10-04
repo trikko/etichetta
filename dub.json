@@ -12,6 +12,9 @@
 	"name": "etichetta",
 	"stringImportPaths": [ "res" ],
 
+	"lflags-linux": [
+		"-rpath=$$ORIGIN/../../ext/onnx/lib"
+	],
 	"dflags-linux": [ "-P-Iext/onnx/include", "-L-Lext/onnx/lib"],
 	"libs-linux" : ["onnxruntime"],
 
