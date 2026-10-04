@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Etichetta
+Comment=A YOLO annotator, for human beings
+Exec=etichetta
+Icon=it.andreafontana.etichetta
+Terminal=false
+Categories=Development;
+StartupWMClass=etichetta

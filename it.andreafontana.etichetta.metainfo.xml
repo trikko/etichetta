@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>it.andreafontana.etichetta</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Etichetta</name>
+  <developer id="it.andreafontana">
+    <name>Andrea Fontana</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f69320</color>
+    <color type="primary" scheme_preference="dark">#be202e</color>
+  </branding>
+
+  <summary>A YOLO annotator, for human beings</summary>
+
+  <description>
+    <p>
+      Etichetta is a simple and efficient tool designed for annotating images for YOLO object detection.
+      It provides a user-friendly interface to quickly draw, edit, and label bounding boxes.
+    </p>
+    <ul>
+      <li>Fast annotation with keyboard shortcuts</li>
+      <li>Zoom into specific areas for precise labeling</li>
+      <li>Easy label management and search</li>
+      <li>AI-assisted annotation with your own ONNX model</li>
+      <li>Lightweight and optimized for human annotators</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">it.andreafontana.etichetta.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main annotation interface</caption>
+      <image type="source">https://raw.githubusercontent.com/trikko/etichetta/main/screenshots/main_window.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/trikko/etichetta</url>
+  <url type="bugtracker">https://github.com/trikko/etichetta/issues</url>
+  <url type="vcs-browser">https://github.com/trikko/etichetta</url>
+  <url type="donation">https://www.paypal.me/andreafontana/5</url>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.1.6" date="2026-10-04">
+      <description>
+        <p>Flatpak support. Frame extraction works with paths containing spaces.</p>
+      </description>
+    </release>
+    <release version="0.1.5" date="2026-10-04">
+      <description>
+        <p>Rebuilt with up-to-date compilers and dependencies.</p>
+      </description>
+    </release>
+    <release version="0.1.4" date="2024-05-13">
+      <description>
+        <p>Faster AI inference, frame extraction from video, copy and paste.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2024-05-07">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

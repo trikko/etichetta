@@ -1728,15 +1728,15 @@ struct GUI
 			outputDir = outputDir[0..outputDir.length - 1];
 
 
-		auto cmd = format("ffmpeg -y -v quiet -stats -progress - -i %s -r %.8f -vf scale=w=%s:h=%s:force_original_aspect_ratio=decrease -qscale:v 2 %s/frame%%06d.jpg",
-			videoPath,
-			1.0f/(delayMs/1000.0f),
-			maxDimension,
-			maxDimension,
-			outputDir
-		);
+		// Arguments are passed one by one: paths may contain spaces
+		auto cmd = [
+			"ffmpeg", "-y", "-v", "quiet", "-stats", "-progress", "-", "-i", videoPath,
+			"-r", format("%.8f", 1.0f/(delayMs/1000.0f)),
+			"-vf", format("scale=w=%s:h=%s:force_original_aspect_ratio=decrease", maxDimension, maxDimension),
+			"-qscale:v", "2", buildPath(outputDir, "frame%06d.jpg")
+		];
 
-		auto pipe = pipeProcess(cmd.split(" "));
+		auto pipe = pipeProcess(cmd);
 
 		while(true)
 		{
