@@ -87,6 +87,9 @@ static immutable defaultLabelColors = [
 	[0, 0.301961, 0.262745],
 ];
 
+// Colors repeat when there are more labels than colors
+auto labelColor(long label) { import std.math : abs; return defaultLabelColors[cast(size_t)(abs(label) % defaultLabelColors.length)]; }
+
 alias StatusChangeCallback 				= void delegate(State);
 alias WorkingDirectoryChangeCallback 	= void delegate(string);
 

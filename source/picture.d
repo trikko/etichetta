@@ -150,6 +150,7 @@ struct Picture
 
 		historyIndex--;
 		rects = history[historyIndex].dup;
+		saveAnnotations();
 
 		GUI.updateHistoryMenu();
 	}
@@ -161,6 +162,7 @@ struct Picture
 
 		historyIndex++;
 		rects = history[historyIndex].dup;
+		saveAnnotations();
 
 		GUI.updateHistoryMenu();
 	}
@@ -211,7 +213,12 @@ struct Picture
 
 			if (!toAnnotate || Picture.rects.length == 0)
 			{
-				loadCurrent();
+				if (!loadCurrent())
+				{
+					import gtk.Main;
+					GUI.showError("No pictures can be loaded from " ~ workingDirectory);
+					Main.quit();
+				}
 				break;
 			}
 
@@ -223,14 +230,34 @@ struct Picture
 	void next(bool toAnnotate = false) { cycle(true, toAnnotate); }
 	void prev(bool toAnnotate = false) { cycle(false, toAnnotate); }
 
-	void loadCurrent()
+	// Load the current picture. Pictures that can't be read are dropped from the list.
+	// Returns false if no picture can be loaded.
+	bool loadCurrent()
 	{
-		assert(list.length > 0);
+		while (list.length > 0)
+		{
+			Pixbuf loaded;
 
-		if (pixbuf !is null)
-			pixbuf.unref();
+			try { loaded = new Pixbuf(current); }
+			catch (Exception e)
+			{
+				warning("Can't load ", current, ": ", e.msg);
+				list = list[0 .. index] ~ list[index + 1 .. $];
+				if (index >= list.length) index = 0;
+				continue;
+			}
 
-		pixbuf = new Pixbuf(current);
+			// Release the previous picture only once the new one is loaded
+			if (pixbuf !is null)
+				pixbuf.unref();
+
+			pixbuf = loaded;
+			break;
+		}
+
+		if (list.length == 0)
+			return false;
+
 		width = pixbuf.getWidth;
 		height = pixbuf.getHeight;
 
@@ -250,6 +277,7 @@ struct Picture
 
 		status = State.EDITING;
 		canvas.queueDraw();
+		return true;
 	}
 
 	void readAnnotations()
@@ -263,22 +291,40 @@ struct Picture
 
 		if (exists(labels))
 		{
-			foreach(l; File(labels).byLine.filter!(a => a.length > 0))
+			string text;
+			try { text = cast(string)std.file.read(labels); }
+			catch (Exception e) { warning("Can't read ", labels, ": ", e.msg); }
+
+			// Skip the UTF-8 BOM some editors add
+			if (text.startsWith("\uFEFF")) text = text[3 .. $];
+
+			// Lines that can't be parsed are skipped: any whitespace is a separator
+			foreach(l; text.lineSplitter)
 			{
-				auto parts = l.chomp.split(" ");
+				auto parts = l.split();
 				if (parts.length < 5)
 					continue;
 
-				Rectangle r;
-				double cx = parts[1].to!double;
-				double cy = parts[2].to!double;
-				r.p1.x = cx - parts[3].to!double / 2;
-				r.p1.y = cy - parts[4].to!double / 2;
-				r.p2.x = r.p1.x + parts[3].to!double;
-				r.p2.y = r.p1.y + parts[4].to!double;
+				try
+				{
+					int label = parts[0].to!int;
+					double cx = parts[1].to!double;
+					double cy = parts[2].to!double;
+					double w = abs(parts[3].to!double);
+					double h = abs(parts[4].to!double);
 
-				r.label = parts[0].to!int;
-				rects ~= r;
+					if (label < 0 || !isFinite(cx) || !isFinite(cy) || !isFinite(w) || !isFinite(h))
+						throw new Exception("invalid values");
+
+					Rectangle r;
+					r.p1.x = cx - w / 2;
+					r.p1.y = cy - h / 2;
+					r.p2.x = cx + w / 2;
+					r.p2.y = cy + h / 2;
+					r.label = label;
+					rects ~= r;
+				}
+				catch (Exception e) { warning("Skipping invalid line in ", labels, ": ", l); }
 			}
 		}
 
@@ -287,48 +333,83 @@ struct Picture
 		GUI.updateHistoryMenu();
 	}
 
+	// Save the annotations and add them to the history
 	void writeAnnotations()
+	{
+		saveAnnotations();
+		historyCommit();
+	}
+
+	// Save the annotations of the current picture. The file is written to a temporary file and then
+	// renamed, so a crash can't leave it half written.
+	bool saveAnnotations()
 	{
 		auto filename = baseName(current).stripExtension ~ ".txt";
 		auto labels = buildPath(workingDirectory, "labels", filename);
-		auto f = File(labels, "w+");
+		auto tmp = labels ~ ".tmp";
 
 		info("Saving file (", rects.length, " lines): ", filename);
 
-		foreach(idx, r; rects)
+		try
 		{
-			auto cx = (r.p1.x + r.p2.x) / 2;
-			auto cy = (r.p1.y + r.p2.y) / 2;
-			auto w = r.p2.x - r.p1.x;
-			auto h = r.p2.y - r.p1.y;
+			auto f = File(tmp, "w");
 
-			auto line = format("%d %.6f %.6f %.6f %.6f", r.label, cx, cy, w, h);
-			f.writeln(line);
+			foreach(idx, r; rects)
+			{
+				// Corners may be swapped if the box was drawn from bottom-right
+				auto cx = (r.p1.x + r.p2.x) / 2;
+				auto cy = (r.p1.y + r.p2.y) / 2;
+				auto w = abs(r.p2.x - r.p1.x);
+				auto h = abs(r.p2.y - r.p1.y);
+
+				f.writefln("%d %.6f %.6f %.6f %.6f", r.label, cx, cy, w, h);
+			}
+
+			f.close();
+			rename(tmp, labels);
+		}
+		catch (Exception e)
+		{
+			error("Can't save ", labels, ": ", e.msg);
+			try { remove(tmp); } catch (Exception) { }
+			GUI.showError("Can't save the annotations of " ~ baseName(current) ~ ":\n" ~ e.msg);
+			return false;
 		}
 
-		f.close();
+		return true;
+	}
 
-		historyCommit();
+	// Pictures in the images folder of a project, sorted by name. Empty if the folder can't be read.
+	string[] listPictures(string dir)
+	{
+		string[] result;
+
+		try
+		{
+			foreach(f; dirEntries(buildPath(dir, "images"), SpanMode.shallow).array.sort!((a,b) => a.name < b.name))
+			{
+				auto ext = extension(f).toLower();
+				if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
+				{
+					warning("Skipping file: ", f);
+					continue;
+				}
+				result ~= f;
+			}
+		}
+		catch (Exception e) { warning("Can't read ", dir, ": ", e.msg); }
+
+		return result;
 	}
 
 	bool readPictures()
 	{
-		list.length = 0;
-
-		foreach(f; dirEntries(buildPath(workingDirectory, "images"), SpanMode.shallow).array.sort!((a,b) => a.name < b.name))
-		{
-			auto ext = extension(f).toLower();
-			if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
-			{
-				warning("Skipping file: ", f);
-				continue;
-			}
-			list ~= f;
-		}
+		list = listPictures(workingDirectory);
 
 		// Load the first one
 		index = 0;
-		loadCurrent();
+		if (!loadCurrent())
+			return false;
 
 		Picture.ViewPort.invalidated = true;
 		status = State.EDITING;
@@ -348,6 +429,7 @@ struct Picture
 		if (!readPictures())
 		{
 			error("Quitting: no pictures available on ", workingDirectory);
+			GUI.showError("No pictures can be loaded from " ~ workingDirectory);
 			Main.quit();
 			return;
 		}

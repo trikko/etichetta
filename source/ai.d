@@ -233,11 +233,23 @@ struct AI
       catch (Exception e) { warning("Can't load WebGPU plugin: ", e.msg); }
    }
 
+   // GPU providers available, best first (Dnnl is a CPU library)
+   string[] gpuProviders()
+   {
+      import std.algorithm.iteration : map, filter;
+      return availableExecProviders.map!(p => p[0]).filter!(n => n != "CPU" && n != "Dnnl").array;
+   }
+
+   // Release the current session. Pointers are reset so they can't be released twice.
+   private void releaseSession()
+   {
+      if (session !is null) { ort.ReleaseSession(session); session = null; }
+      if (memory_info !is null) { ort.ReleaseMemoryInfo(memory_info); memory_info = null; }
+   }
+
    void unload()
    {
-      // Release resourece from previous session
-      if (session !is null) ort.ReleaseSession(session);
-      if (memory_info !is null) ort.ReleaseMemoryInfo(memory_info);
+      releaseSession();
 
       labelsFile = "";
       modelFile = "";
@@ -246,7 +258,8 @@ struct AI
       labelsMap = null;
    }
 
-   bool load(string file, string labels, string provider="CPU")
+   // Load a model. With useGpu, GPU providers are tried in order and CPU is the last resort.
+   bool load(string file, string labels, bool useGpu = false)
    {
       assert(hasAI);
       modelFile = "";
@@ -254,18 +267,15 @@ struct AI
       import std.string : toStringz;
 
       OrtSessionOptions* session_options;
-      bool sessionCreated = false;
 
-      // Release resourece from previous session
-      if (session !is null) ort.ReleaseSession(session);
-      if (memory_info !is null) ort.ReleaseMemoryInfo(memory_info);
+      releaseSession();
 
       // Try loading the model
       try
       {
          // Execution providers must be added to the options before the session is created.
-         // If the provider can't be used (missing drivers, libraries, ...) we fall back to CPU.
-         foreach (selected; provider == "CPU" ? ["CPU"] : [provider, "CPU"])
+         // If a provider can't be used (missing drivers, libraries, ...) we try the next one, CPU last.
+         foreach (selected; (useGpu ? gpuProviders : []) ~ "CPU")
          {
             ort.CreateSessionOptions(&session_options).validate();
             scope(exit) ort.ReleaseSessionOptions(session_options);
@@ -299,11 +309,10 @@ struct AI
             catch (Exception e)
             {
                if (selected == "CPU") throw e;
-               warning("Can't use provider ", selected, ", falling back to CPU: ", e.msg);
+               warning("Can't use provider ", selected, ", trying the next one: ", e.msg);
             }
          }
 
-         sessionCreated = true;
 
          size_t num_input_nodes;
          ort.SessionGetInputCount(session, &num_input_nodes).validate();
@@ -325,7 +334,7 @@ struct AI
       catch (Exception e)
       {
          info("Error loading model: ", e.msg);
-         if (sessionCreated) ort.ReleaseSession(session);
+         releaseSession();
          return false;
       }
 
@@ -395,7 +404,18 @@ struct AI
       long[3] outDims;
       size_t numberOfelements;
 
-      infer(impr, outPtr, outDims, numberOfelements);
+      try infer(impr, outPtr, outDims, numberOfelements);
+      catch (Exception e)
+      {
+         // A GPU can fail while running (out of memory, unsupported operation, ...): retry on CPU
+         if (activeProvider == "CPU") throw e;
+         warning("Inference on ", activeProvider, " failed, switching to CPU: ", e.msg);
+
+         auto model = modelFile, labelsPath = labelsFile;
+         if (!load(model, labelsPath, false)) throw e;
+         infer(impr, outPtr, outDims, numberOfelements);
+      }
+
       scope Slice!(float*, 3) outSlice = outPtr[0..numberOfelements].sliced(outDims[0], outDims[1], outDims[2]);
 
       auto format = detectFormat(outSlice, labels.length);
@@ -641,7 +661,7 @@ struct AI
    // Scale the picture to fit the model input, pad with gray and convert to a CHW float tensor
    float[] letterBoxAndPreprocess(Pixbuf img, out float scale)
    {
-      import std.algorithm.comparison : min;
+      import std.algorithm.comparison : min, max;
       import gdkpixbuf.c.types : GdkInterpType;
 
       size_t w = inputW;
@@ -650,8 +670,9 @@ struct AI
       auto iw = img.getWidth();
       auto ih = img.getHeight();
       scale = min((cast(float)w)/iw, (cast(float)h)/ih);
-      auto nw = cast(int)(iw*scale);
-      auto nh = cast(int)(ih*scale);
+      // At least one pixel, even for very thin pictures
+      auto nw = max(1, cast(int)(iw*scale));
+      auto nh = max(1, cast(int)(ih*scale));
 
       auto tensor = new float[3 * h * w];
       tensor[] = 128.0f / 255.0f;

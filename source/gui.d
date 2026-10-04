@@ -254,6 +254,12 @@ struct GUI
 				return true;
 			}
 
+			if (Picture.listPictures(dialog.getFilename).empty)
+			{
+				showError("The folder 'images' doesn't contain any picture (png, jpg, jpeg)");
+				return true;
+			}
+
 			// If keeping zoom on exit is not active, reset the viewport
 			if (!mnuZoomOnExit.getActive)
 				resetZoom();
@@ -449,9 +455,8 @@ struct GUI
 
 		// GPU acceleration is on by default when a GPU provider is available (WebGPU, CUDA, ...),
 		// unless the user turned it off. If the GPU fails, the model is loaded on CPU anyway.
-		// (Dnnl is a CPU library)
 		import settings : Settings;
-		auto hasGpu = AI.availableExecProviders.length > 0 && AI.availableExecProviders[0][0] != "CPU" && AI.availableExecProviders[0][0] != "Dnnl";
+		auto hasGpu = !AI.gpuProviders.empty;
 		chkAIGpu.setSensitive = hasGpu;
 		chkAIGpu.setActive = hasGpu && Settings.get("gpu", "true") == "true";
 
@@ -459,7 +464,7 @@ struct GUI
 		import scaler : Swscale;
 		string gpu;
 		if (AI.hasModel) gpu = "Model running on: " ~ AI.activeProvider;
-		else if (hasGpu) gpu = "GPU acceleration: " ~ AI.availableExecProviders[0][0] ~ " available";
+		else if (hasGpu) gpu = "GPU acceleration: " ~ AI.gpuProviders.join(", ") ~ " available";
 		else gpu = "GPU acceleration: not available";
 
 		auto scaling = Swscale.available
@@ -513,6 +518,14 @@ struct GUI
 		canvas.queueDraw();
 	}
 
+	void showError(string message)
+	{
+		import gtk.MessageDialog;
+		auto dialog = new MessageDialog(mainWindow, DialogFlags.MODAL, MessageType.ERROR, ButtonsType.CLOSE, "%s", message);
+		dialog.run();
+		dialog.destroy();
+	}
+
 	void showMissingAIError()
 	{
 		import gtk.MessageDialog;
@@ -558,9 +571,13 @@ struct GUI
 				else if (!AI.hasModel) actionShowAISettings();
 				else
 				{
-					AI.boxes();
-					Picture.historyCommit();
-					Picture.writeAnnotations();
+					try
+					{
+						AI.boxes();
+						Picture.writeAnnotations();
+					}
+					catch (Exception e) { showError("AI annotation failed:\n" ~ e.msg); }
+
 					canvas.queueDraw();
 				}
 
@@ -679,7 +696,8 @@ struct GUI
 			if (status == State.EDITING && idx == 0) w.setDash([5, 5], 0);
 			else w.setDash([], 0);
 
-			w.setSourceRgba(defaultLabelColors[r.label][0], defaultLabelColors[r.label][1], defaultLabelColors[r.label][2], 0.8);
+			auto color = labelColor(r.label);
+			w.setSourceRgba(color[0], color[1], color[2], 0.8);
 
 			auto rp1 = normalizedToViewPort(r.p1);
 			auto rp2 = normalizedToViewPort(r.p2);
@@ -800,7 +818,8 @@ struct GUI
 
 			// Draw the bounding box
 
-			w.setSourceRgba(defaultLabelColors[label][0], defaultLabelColors[label][1], defaultLabelColors[label][2], 0.8);
+			auto color = labelColor(label);
+			w.setSourceRgba(color[0], color[1], color[2], 0.8);
 			w.rectangle(
 				Picture.ViewPort.offsetX + rp1.x,
 				Picture.ViewPort.offsetY + rp1.y,
@@ -1310,10 +1329,7 @@ struct GUI
 
 					auto outputDir = buildPath(dirName(video), video.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
 
-					auto res = extractFrames(video, outputDir, interval, size);
-					Idle.add(&extractResult, &res);
-
-					Thread.sleep(500.msecs);
+					Idle.add(&extractResult, idleValue(extractFrames(video, outputDir, interval, size)));
 				}).start();
 			}
 
@@ -1351,6 +1367,8 @@ struct GUI
 
 					extern(C) int resize (void* data)
 					{
+						import core.stdc.stdlib : free;
+						scope(exit) free(data);
 						double fraction = *(cast(double*)data);
 
 						if (fraction < 0) wndResize.hide();
@@ -1415,12 +1433,11 @@ struct GUI
 
 							rp = 1.0*idx/entries.length;
 
-							Idle.add(&resize, &rp);
+							Idle.add(&resize, idleValue(rp));
 						}
 
 						rp = -1;
-						Idle.add(&resize, &rp);
-						Thread.sleep(1000.msecs);
+						Idle.add(&resize, idleValue(rp));
 					}
 				}).start();
 			}
@@ -1443,8 +1460,9 @@ struct GUI
 			import ai: AI;
 			import gtk.MessageDialog;
 
-			auto model = fileAIModel.getFile().getPath();
-			auto labels = fileAILabels.getFile().getPath();
+			// getFile() is null if nothing was selected
+			auto model = fileAIModel.getFile() ? fileAIModel.getFile().getPath() : "";
+			auto labels = fileAILabels.getFile() ? fileAILabels.getFile().getPath() : "";
 
 			// Remember the user choice about GPU acceleration
 			import settings : Settings;
@@ -1473,7 +1491,7 @@ struct GUI
 			}
 
 			// Load the model and the labels
-			if(!AI.load(model, labels, chkAIGpu.getActive?AI.availableExecProviders[0][0]:"CPU"))
+			if(!AI.load(model, labels, chkAIGpu.getActive))
 			{
 				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Error loading the model.\nPlease check the files and try again.");
 				dialog.setModal(true);
@@ -1548,7 +1566,7 @@ struct GUI
 		mnuDeleteAnnotation.addOnButtonPress( (Event e, Widget w){ actionDeleteRect(); return true; } );
 
 		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndo(); return true; } );
-		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionRedo(); return true; } );
+		mnuRedo.addOnButtonPress( (Event e, Widget w){ actionRedo(); return true; } );
 
 		mnuGuides.addOnButtonPress( (Event e, Widget w){ actionToggleGuides(); return true; } );
 
@@ -1700,8 +1718,21 @@ struct GUI
 		FFMPEG_KILLED
 	}
 
+	// Values passed to Idle callbacks from other threads: copied with malloc (the GC can't see
+	// pointers held by GLib) and freed by the callback
+	static T* idleValue(T)(T value)
+	{
+		import core.stdc.stdlib : malloc;
+		auto p = cast(T*)malloc(T.sizeof);
+		*p = value;
+		return p;
+	}
+
 	extern(C) int extractProgress(void* processed)
 	{
+		import core.stdc.stdlib : free;
+		scope(exit) free(processed);
+
 		if (lblProgress.getVisible == false)
 			lblProgress.showAll();
 
@@ -1712,6 +1743,9 @@ struct GUI
 
 	extern(C) int extractResult(void* result)
 	{
+		import core.stdc.stdlib : free;
+		scope(exit) free(result);
+
 		auto r = *(cast(FfmpegError*)result);
 
 		if (r == FfmpegError.FFMPEG_KILLED) { return 0; }
@@ -1787,7 +1821,7 @@ struct GUI
 				if(processed > 0)
 				{
 					import glib.Idle;
-					Idle.add(&extractProgress, &processed);
+					Idle.add(&extractProgress, idleValue(processed));
 				}
 			}
 		}

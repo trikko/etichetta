@@ -27,7 +27,7 @@ module main;
 
 import std.file : write, tempDir, exists, mkdirRecurse, rmdirRecurse;
 import std.path : buildPath;
-import std.logger : info;
+import std.logger : info, warning;
 
 import gtk.Main;
 
@@ -38,16 +38,21 @@ import ai : AI;
 
 import common;
 
+void deleteExamples(string dir)
+{
+	try { rmdirRecurse(dir); info("Example files deleted."); }
+	catch (Exception e) { warning("Can't delete ", dir, ": ", e.msg); }
+}
+
 int mainImpl(string[] args)
 {
 	import imports;
 
-	// Write example files to a temp dir
-	auto tmpDir = buildPath(tempDir(), "etichetta_example");
+	// Write example files to a temp dir. Its name is unique: another instance may be using its own.
+	import std.uuid : randomUUID;
+	auto tmpDir = buildPath(tempDir(), "etichetta_example-" ~ randomUUID.toString);
 	auto tmpImagesDir = buildPath(tmpDir, "images");
 	auto tmpLabelsDir = buildPath(tmpDir, "labels");
-
-	try { rmdirRecurse(tmpDir); } catch (Exception e) { }
 
 	if (!exists(tmpDir)) mkdirRecurse(tmpDir);
 	if (!exists(tmpImagesDir)) mkdirRecurse(tmpImagesDir);
@@ -59,7 +64,7 @@ int mainImpl(string[] args)
 	write(buildPath(tmpImagesDir, "example_02.jpg"), EXAMPLES[1]);
 
 	// Delete temp dir on exit
-	scope(exit) { rmdirRecurse(tmpDir); info("Example files deleted."); }
+	scope(exit) deleteExamples(tmpDir);
 
 	info("Example files written to: ", tmpDir);
 
