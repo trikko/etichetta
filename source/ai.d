@@ -187,27 +187,43 @@ struct AI
       // Try loading the model
       try
       {
-         ort.CreateSessionOptions(&session_options).validate();
-         scope(exit) ort.ReleaseSessionOptions(session_options);
-
-         ort.SetIntraOpNumThreads(session_options, 4);
-         ort.SetSessionLogSeverityLevel(session_options, 4);
-         ort.SetSessionGraphOptimizationLevel(session_options, GraphOptimizationLevel.ORT_ENABLE_ALL);
-         ort.SetSessionExecutionMode(session_options, ExecutionMode.ORT_PARALLEL);
-
-         version(linux)    ort.CreateSession(env, file.toStringz, session_options, &session).validate();
-         version(windows)  ort.CreateSession(env, cast(ushort*)file.toStringz, session_options, &session).validate();
-
-         sessionCreated = true;
-
-         foreach(available; availableExecProviders)
+         // Execution providers must be added to the options before the session is created.
+         // If the provider can't be used (missing drivers, libraries, ...) we fall back to CPU.
+         foreach (selected; provider == "CPU" ? ["CPU"] : [provider, "CPU"])
          {
-            if (available[0] == "CPU" || available[0] == provider)
+            ort.CreateSessionOptions(&session_options).validate();
+            scope(exit) ort.ReleaseSessionOptions(session_options);
+
+            ort.SetIntraOpNumThreads(session_options, 4);
+            ort.SetSessionLogSeverityLevel(session_options, 4);
+            ort.SetSessionGraphOptimizationLevel(session_options, GraphOptimizationLevel.ORT_ENABLE_ALL);
+            ort.SetSessionExecutionMode(session_options, ExecutionMode.ORT_PARALLEL);
+
+            try
             {
-               try { available[1](session_options, 0).validate(); info("PROVIDER SELECTED: ", available[0]); break; }
-               catch (Exception e) { warning( "Error loading provider "~ provider[0] ~ ": " ~ e.msg); }
+               // CPU is always available, no need to add it
+               if (selected != "CPU")
+               {
+                  auto found = std.algorithm.searching.find!(p => p[0] == selected)(availableExecProviders);
+                  if (found.empty) throw new Exception("provider not available");
+                  found.front[1](session_options, 0).validate();
+               }
+
+               // ORTCHAR_T is wchar_t on Windows, char elsewhere
+               version(Windows) ort.CreateSession(env, cast(Parameters!(typeof(OrtApi.CreateSession))[1]) file.toUTF16z, session_options, &session).validate();
+               else ort.CreateSession(env, file.toStringz, session_options, &session).validate();
+
+               info("PROVIDER SELECTED: ", selected);
+               break;
+            }
+            catch (Exception e)
+            {
+               if (selected == "CPU") throw e;
+               warning("Can't use provider ", selected, ", falling back to CPU: ", e.msg);
             }
          }
+
+         sessionCreated = true;
 
          size_t num_input_nodes;
          ort.SessionGetInputCount(session, &num_input_nodes).validate();
