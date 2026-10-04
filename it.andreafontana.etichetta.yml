@@ -1,0 +1,151 @@
+app-id: it.andreafontana.etichetta
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: etichetta
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.ldc
+  - org.freedesktop.Sdk.Extension.llvm20
+
+build-options:
+  append-path: /usr/lib/sdk/ldc/bin:/usr/lib/sdk/llvm20/bin
+  append-ld-library-path: /usr/lib/sdk/ldc/lib:/usr/lib/sdk/llvm20/lib
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+
+modules:
+  - name: onnxruntime
+    buildsystem: simple
+    sources:
+      - type: archive
+        dest: onnx
+        only-arches: [x86_64]
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x64-1.17.3.tgz
+        sha256: f2f11f9da1e3e19b22a8b378b9af57a58433f40e3db6a803e75c0ec0eba97a20
+
+      - type: archive
+        dest: onnx
+        only-arches: [aarch64]
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-aarch64-1.17.3.tgz
+        sha256: 9f801577bd99676d1d821022e52b1f4554f56339ae3606c7b5ff3155f443c921
+
+    build-commands:
+      - mkdir -p /app/lib /app/include
+      - cp -P onnx/lib/libonnxruntime.so* /app/lib/
+      - cp -r onnx/include/* /app/include/
+
+  - name: etichetta
+    buildsystem: simple
+
+
+    ##     Fetching dplug 13.4.9 (getting selected version)
+    ##     Fetching mir-algorithm 3.22.4 (getting selected version)
+    ##     Fetching dvector 0.0.5 (getting selected version)
+    ##     Fetching bcaa 0.0.9 (getting selected version)
+    ##     Fetching intel-intrinsics 1.14.2 (getting selected version)
+
+    sources:
+      - type: git
+        url: https://github.com/AuburnSounds/intel-intrinsics.git 
+        tag: v1.14.2
+        commit: 9607882c11fc8756504c69dc44af87f4065964bb
+        dest: deps/intel-intrinsics
+
+      - type: git
+        url: https://github.com/AuburnSounds/dplug.git 
+        tag: v13.4.9
+        commit: 1b18b122c5afdddef7a3c7153170df5446516dd9
+        dest: deps/dplug
+
+      - type: git
+        url: https://github.com/aferust/bcaa.git
+        tag: v0.0.9
+        commit: 10b0a1dc262733f90057666a812b70931b7dc76f
+        dest: deps/bcaa
+
+      - type: git
+        url: https://github.com/libmir/mir-core.git
+        tag: v1.7.4
+        commit: 4397b03a804b0368100e99252016c7b32aa562d1
+        dest: deps/mir-core
+
+      - type: git
+        url: https://github.com/libmir/mir-algorithm.git
+        tag: v3.22.4
+        commit: ecde2eb4ff41dc9d9dc6f71234d0838dccce22b4
+        dest: deps/mir-algorithm
+
+      - type: git
+        url: https://github.com/libmir/mir-random.git
+        tag: v2.2.19
+        commit: c38881dc5264c5ee148ae51e7648d48da5dda520
+        dest: deps/mir-random
+
+      - type: git
+        url: https://github.com/libmir/mir-linux-kernel.git
+        tag: v1.2.1
+        commit: 76220f087a9535c2ebcc23708c6fcea01f7dc43c
+        dest: deps/mir-linux-kernel
+
+      - type: git
+        url: https://github.com/aferust/dvector.git
+        tag: v0.0.5
+        commit: 79e5d8902194d2898f0924ec45ff11b620dcdc72
+        dest: deps/dvector
+
+      - type: git
+        url: https://gitlab.com/AntonMeep/silly.git
+        tag: v1.1.1
+        commit: 9c7743d73b7dae6c7ec841fe719d0a04a99096b9
+        dest: deps/silly
+
+      - type: git
+        url: https://github.com/libmir/dcv.git
+        # Same commit used by dub.json
+        commit: 51c1147092006c64e875eef6311abb62e6eb92b5
+        dest: deps/dcv
+
+      - type: git
+        url: https://github.com/gtkd-developers/GtkD.git
+        tag: v3.10.0
+        commit: cb212656dc641164c36f2727592e41e57ea4dbed
+        dest: deps/gtk-d
+
+      - type: git
+        url: https://github.com/trikko/etichetta.git
+        tag: v0.1.6
+        commit: f0f17bec7c828eebd90ddb4457c43a7a6c414dbd
+    build-commands:
+    
+      # We need ext/onnx to exist for dub.json paths
+      - mkdir -p ext/onnx
+      - cp -r /app/include ext/onnx/include
+      - cp -r /app/lib ext/onnx/lib
+      # Build the app
+      - rm -f dub.selections.json
+      # dcv is a git dependency in dub.json: point it to the local checkout
+      - |
+        sed -i 's#"repository": "git+https://github.com/libmir/dcv", "version": "51c1147"#"path": "deps/dcv"#' dub.json
+      - dub add-local --system deps/mir-core
+      - dub add-local --system deps/mir-algorithm
+      - dub add-local --system deps/mir-random
+      - dub add-local --system deps/mir-linux-kernel
+      - dub add-local --system deps/dvector
+      - dub add-local --system deps/silly
+      - dub add-local --system deps/gtk-d
+      - dub add-local --system deps/bcaa
+      - dub add-local --system deps/intel-intrinsics
+      - dub add-local --system deps/dplug
+      - dub build --compiler=ldc2 --build=release --skip-registry=all
+      # Install
+      - install -Dm755 output/bin/etichetta /app/bin/etichetta
+      - install -Dm644 res/etichetta.svg /app/share/icons/hicolor/scalable/apps/it.andreafontana.etichetta.svg
+      - install -Dm644 it.andreafontana.etichetta.desktop /app/share/applications/it.andreafontana.etichetta.desktop
+      - install -Dm644 LICENSE /app/share/licenses/it.andreafontana.etichetta/LICENSE
+      - install -Dm644 it.andreafontana.etichetta.metainfo.xml /app/share/metainfo/it.andreafontana.etichetta.metainfo.xml
