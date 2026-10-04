@@ -55,14 +55,27 @@ struct Swscale
 
       if (context is null) return false;
 
-      const(ubyte)*[4] srcPlanes = [src, null, null, null];
-      int[4] srcStrides = [srcStride, 0, 0, 0];
-
       // GBRP order: planes are G, B, R
       ubyte*[4] dstPlanes = [cast(ubyte*)g, cast(ubyte*)b, cast(ubyte*)r, null];
       int[4] dstStrides = [planeStride * cast(int)float.sizeof, planeStride * cast(int)float.sizeof, planeStride * cast(int)float.sizeof, 0];
 
-      return sws_scale(context, srcPlanes.ptr, srcStrides.ptr, 0, srcH, dstPlanes.ptr, dstStrides.ptr) == dstH;
+      // SIMD code may read a few bytes past the end of a row: the last row of a pixbuf has no
+      // padding, so it is passed as a separate slice from a padded copy.
+      int[4] srcStrides = [srcStride, 0, 0, 0];
+      int lines = 0;
+
+      if (srcH > 1)
+      {
+         const(ubyte)*[4] srcPlanes = [src, null, null, null];
+         lines += sws_scale(context, srcPlanes.ptr, srcStrides.ptr, 0, srcH - 1, dstPlanes.ptr, dstStrides.ptr);
+      }
+
+      auto lastRow = new ubyte[srcStride + 64];
+      lastRow[0 .. srcW * channels] = src[(srcH - 1) * srcStride .. (srcH - 1) * srcStride + srcW * channels];
+      const(ubyte)*[4] lastPlanes = [lastRow.ptr, null, null, null];
+      lines += sws_scale(context, lastPlanes.ptr, srcStrides.ptr, srcH - 1, 1, dstPlanes.ptr, dstStrides.ptr);
+
+      return lines == dstH;
    }
 
    void load()

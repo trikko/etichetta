@@ -132,7 +132,7 @@ struct GUI
 			store.setValue(top, 0, pb);
 
 			if (idx < labels.length) store.setValue(top, 1, labels[idx].toUpper);
-			else store.setValue(top, 1, "<label not defined>");
+			else store.setValue(top, 1, labelName(idx).toUpper ~ " (not in labels file)");
 
 			store.setValue(top, 2, idx);
 
@@ -475,8 +475,9 @@ struct GUI
 		btnAIOk.setSensitive(true);
 		btnAIOk.setLabel("Load");
 
-		adjConfidence.setValue(60);
-		adjOverlapping.setValue(50);
+		// Show the values in use, or the defaults if no model is loaded yet
+		adjConfidence.setValue(AI.hasModel ? AI.minConfidence * 100 : 60);
+		adjOverlapping.setValue(AI.hasModel ? AI.maxOverlapping * 100 : 50);
 		wndAI.showAll();
 	}
 
@@ -516,6 +517,13 @@ struct GUI
 		Picture.rects ~= cloneBuffer;
 		Picture.writeAnnotations();
 		canvas.queueDraw();
+	}
+
+	// Name of a label. Classes missing from the labels file get a generic name, so boxes
+	// written by other tools are still shown and kept.
+	string labelName(long idx)
+	{
+		return idx >= 0 && idx < labels.length ? labels[idx] : format("class %d", idx);
 	}
 
 	void showError(string message)
@@ -759,9 +767,8 @@ struct GUI
 				w.stroke();
 
 				// Draw a small label under the rect
-				if (r.label < labels.length)
 				{
-					string text = labels[r.label];
+					string text = labelName(r.label);
 					if (r.score != float.max)
 						text ~= format(" (%2.2f%%)", 100*r.score);
 
@@ -844,18 +851,18 @@ struct GUI
 			}
 
 			// Draw a small label under the rect
-			if (points.length > 1 && label < labels.length)
+			if (points.length > 1)
 			{
 				cairo_text_extents_t te;
 				w.setFontSize(10);
-				w.textExtents(labels[label], &te);
+				w.textExtents(labelName(label), &te);
 				w.rectangle(Picture.ViewPort.offsetX + rp1.x - 5, Picture.ViewPort.offsetY + rp2.y + 8, te.width + 10, 18);
 				w.fill();
 
 				w.setSourceRgba(0,0,0, 0.8);
 				w.setFontSize(10);
 				w.moveTo(Picture.ViewPort.offsetX + rp1.x, Picture.ViewPort.offsetY + rp2.y + 8 + te.height + (18 - te.height) / 2);
-				w.showText(labels[label]);
+				w.showText(labelName(label));
 			}
 
 			if (showGuides)
@@ -1259,7 +1266,8 @@ struct GUI
 		if (!exists(file))
 			return false;
 
-		labels = readText(file).splitter("\n").filter!(a => a.length > 0).map!(x => x.strip).array;
+		try labels = readClassNames(file);
+		catch (Exception e) { warning("Can't read ", file, ": ", e.msg); return false; }
 		return true;
 	}
 
@@ -1493,7 +1501,7 @@ struct GUI
 			// Load the model and the labels
 			if(!AI.load(model, labels, chkAIGpu.getActive))
 			{
-				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "Error loading the model.\nPlease check the files and try again.");
+				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "%s", "Error loading the model:\n" ~ (AI.lastError.empty ? "please check the files and try again." : AI.lastError));
 				dialog.setModal(true);
 				dialog.run();
 				dialog.destroy();

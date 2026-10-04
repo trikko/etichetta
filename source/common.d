@@ -109,3 +109,17 @@ void 		workingDirectory(string dir) 	{ _workingDirectory = dir; _workingDirector
 string 	workingDirectory() 				{ return _workingDirectory; }
 
 void 		addWorkingDirectoryChangeCallback(WorkingDirectoryChangeCallback cb) { _workingDirectoryCallback ~= cb; }
+
+// Class names of a labels/classes file: one per line. Blank lines are skipped, as YOLO tools do.
+string[] readClassNames(string file)
+{
+	import std.file : read;
+	import std.string : lineSplitter, strip;
+	import std.algorithm : map, filter, startsWith;
+	import std.array : array;
+
+	auto text = cast(string)read(file);
+	if (text.startsWith("\uFEFF")) text = text[3 .. $];	// UTF-8 BOM
+
+	return text.lineSplitter.map!(l => l.strip).filter!(l => l.length > 0).array;
+}

@@ -37,7 +37,7 @@ def read_classes(project):
     for name in ("labels.txt", "classes.txt"):
         f = project / name
         if f.exists():
-            classes = [l.strip() for l in f.read_text().splitlines() if l.strip()]
+            classes = [l.strip() for l in f.read_text(encoding="utf-8-sig").splitlines() if l.strip()]
             if classes:
                 return classes, f
     sys.exit(f"No classes.txt or labels.txt found in {project}")
@@ -47,7 +47,7 @@ def read_label_file(path, num_classes):
     """Return the valid YOLO lines of a label file, and how many lines were skipped."""
     lines, skipped = [], 0
 
-    for raw in path.read_text().splitlines():
+    for raw in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
         parts = raw.split()
         if not parts:
             continue
@@ -62,11 +62,15 @@ def read_label_file(path, num_classes):
         # Boxes drawn from bottom-right have negative size
         w, h = abs(w), abs(h)
 
-        if not 0 <= cls < num_classes or w == 0 or h == 0:
+        # Boxes past the picture borders are rejected by YOLO: clip them
+        x1, y1 = max(0.0, cx - w / 2), max(0.0, cy - h / 2)
+        x2, y2 = min(1.0, cx + w / 2), min(1.0, cy + h / 2)
+
+        if not 0 <= cls < num_classes or x2 <= x1 or y2 <= y1:
             skipped += 1
             continue
 
-        lines.append(f"{cls} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
+        lines.append(f"{cls} {(x1 + x2) / 2:.6f} {(y1 + y2) / 2:.6f} {x2 - x1:.6f} {y2 - y1:.6f}")
 
     return lines, skipped
 

@@ -59,6 +59,7 @@ struct AI
 
    ExecutionProvider[] availableExecProviders;
    string activeProvider;  // Provider used by the loaded model
+   string lastError;       // Why the last load() failed, for the user
 
    // Output layouts we can decode. nc = number of classes.
    enum OutputFormat
@@ -111,7 +112,7 @@ struct AI
          // An older library doesn't support the API version we were built with
          if (ort is null)
          {
-            warning("onnxruntime is too old, version 1.24 or later is needed");
+            warning("onnxruntime is too old, version 1.", ORT_API_VERSION, " or later is needed");
             return;
          }
 
@@ -138,13 +139,14 @@ struct AI
          foreach(p; executionProvidersNames)
          {
             import core.sys.posix.dlfcn : dlsym;
+            version(OSX) enum RTLD_DEFAULT = cast(void*)-2; else enum RTLD_DEFAULT = null;
             auto provider = p;
-            auto func = "OrtSessionOptionsAppendExecutionProvider_" ~ provider;
+            auto func = ("OrtSessionOptionsAppendExecutionProvider_" ~ provider).toStringz;
 
-            if (cast(void*)dlsym(null, func.ptr))
+            if (auto funcPtr = dlsym(RTLD_DEFAULT, func))
             {
                info("Found ", provider, " provider");
-               availableExecProviders ~= ExecutionProvider(provider, cast(ProviderFunc)dlsym(null, func.ptr));
+               availableExecProviders ~= ExecutionProvider(provider, cast(ProviderFunc)funcPtr);
             }
          }
       }
@@ -157,8 +159,8 @@ struct AI
             foreach(p; executionProvidersNames)
             {
                auto provider = p;
-               auto func = "OrtSessionOptionsAppendExecutionProvider_" ~ provider;
-               auto funcPtr = cast(ProviderFunc) GetProcAddress(hModule, func.ptr);
+               auto func = ("OrtSessionOptionsAppendExecutionProvider_" ~ provider).toStringz;
+               auto funcPtr = cast(ProviderFunc) GetProcAddress(hModule, func);
                if (funcPtr !is null)
                {
                   info("Found ", provider, " provider");
@@ -263,6 +265,7 @@ struct AI
    {
       assert(hasAI);
       modelFile = "";
+      lastError = "";
 
       import std.string : toStringz;
 
@@ -334,19 +337,50 @@ struct AI
       catch (Exception e)
       {
          info("Error loading model: ", e.msg);
+         lastError = e.msg;
          releaseSession();
          return false;
       }
 
       try {
-         import std.algorithm : filter, map;
          labelsFile = labels;
-         this.labels = readText(labels).splitter("\n").filter!(a => a.length > 0).map!(x => x.strip).array;
+         this.labels = readClassNames(labels);
       }
       catch (Exception e)
       {
          warning("Error reading labels file: ", e.msg);
+         lastError = "Can't read the labels file: " ~ e.msg;
          return false;
+      }
+
+      // Only detection models with one float output are supported (not segmentation, pose, fp16, ...)
+      size_t outputs;
+      ort.SessionGetOutputCount(session, &outputs).validate();
+      if (outputs != 1)
+      {
+         lastError = format("The model has %s outputs: only object detection models (one output) are supported", outputs);
+         warning(lastError);
+         return false;
+      }
+
+      foreach (isInput; [true, false])
+      {
+         OrtTypeInfo* typeInfo;
+         if (isInput) ort.SessionGetInputTypeInfo(session, 0, &typeInfo).validate();
+         else ort.SessionGetOutputTypeInfo(session, 0, &typeInfo).validate();
+         scope(exit) ort.ReleaseTypeInfo(typeInfo);
+
+         OrtTensorTypeAndShapeInfo* tensorInfo;
+         ort.CastTypeInfoToTensorInfo(typeInfo, &tensorInfo).validate();
+
+         ONNXTensorElementDataType type;
+         ort.GetTensorElementType(tensorInfo, &type).validate();
+         if (type != ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT)
+         {
+            lastError = "The model must use float32 " ~ (isInput ? "input" : "output") ~ " (export it without half precision)";
+            warning(lastError);
+            return false;
+         }
       }
 
       OrtTypeInfo* input_type_info;
@@ -361,7 +395,8 @@ struct AI
 
       if (num_dims != 4)
       {
-         warning("Input shape is not 4D");
+         lastError = "The model input is not an image (4 dimensions expected)";
+         warning(lastError);
          return false;
       }
 
@@ -375,7 +410,8 @@ struct AI
 
       if (input_dims[1] != 3)
       {
-         warning("Only rgb images are supported as input");
+         lastError = "Only RGB images are supported as input";
+         warning(lastError);
          return false;
       }
 
@@ -439,7 +475,14 @@ struct AI
          }
 
          // only one scale value is enough with a letterbox image.
-         candidates ~= Rectangle(Point(d.x1/scale/Picture.width, d.y1/scale/Picture.height), Point(d.x2/scale/Picture.width, d.y2/scale/Picture.height), labelsMap[d.cls], d.score);
+         // Boxes may go past the picture borders (and into the letterbox padding): clamp them.
+         auto p1 = Point(clamp(d.x1/scale/Picture.width, 0.0, 1.0), clamp(d.y1/scale/Picture.height, 0.0, 1.0));
+         auto p2 = Point(clamp(d.x2/scale/Picture.width, 0.0, 1.0), clamp(d.y2/scale/Picture.height, 0.0, 1.0));
+
+         if (p2.x - p1.x <= 0 || p2.y - p1.y <= 0)
+            continue;
+
+         candidates ~= Rectangle(p1, p2, labelsMap[d.cls], d.score);
       }
 
       // Non-maximum suppression: best scores first, a box is dropped if it overlaps too much
@@ -506,7 +549,8 @@ struct AI
          foreach (i; 0 .. rows)
          {
             auto c = output[0, i, 5];
-            if (c != cast(int)c || c < 0 || c >= nc) { integral = false; break; }
+            // Ids beyond the labels file are fine: those boxes are skipped later
+            if (c != cast(int)c || c < 0) { integral = false; break; }
          }
 
          if (integral) return OutputFormat.endToEnd;
@@ -521,6 +565,16 @@ struct AI
       if (rows > 4 && rows < cols) return OutputFormat.yolov8;
 
       return OutputFormat.unknown;
+   }
+
+   // True if the boxes of a [1, N, ...] output (first 4 columns) are normalized to [0, 1]
+   bool isNormalized(S)(S output)
+   {
+      foreach (i; 0 .. output.shape[1])
+         foreach (j; 0 .. 4)
+            if (output[0, i, j] > 1.5f) return false;
+
+      return true;
    }
 
    // Extract the detections over the threshold, in input tensor coordinates
@@ -552,10 +606,7 @@ struct AI
 
          case OutputFormat.yolov8T:
             // RT-DETR gives coordinates normalized to [0, 1]
-            bool normalized = true;
-            foreach (i; 0 .. output.shape[1])
-               foreach (j; 0 .. 4)
-                  if (output[0, i, j] > 1.5f) normalized = false;
+            bool normalized = isNormalized(output);
 
             float sx = normalized ? inputW : 1;
             float sy = normalized ? inputH : 1;
@@ -582,10 +633,7 @@ struct AI
 
          case OutputFormat.endToEnd:
             // YOLO gives corners in pixels, RT-DETR gives center and size normalized to [0, 1]
-            bool normalized = true;
-            foreach (i; 0 .. output.shape[1])
-               foreach (j; 0 .. 4)
-                  if (output[0, i, j] > 1.5f) normalized = false;
+            bool normalized = isNormalized(output);
 
             foreach (i; 0 .. output.shape[1])
             {
@@ -652,10 +700,13 @@ struct AI
       size_t dcount0;
       ort.GetDimensionsCount(sh0, &dcount0).validate();
 
-      long[] dims0 = (cast(long*)malloc(dcount0 * long.sizeof))[0..dcount0];
-      ort.GetDimensions(sh0, dims0.ptr, dcount0).validate();
-      outDims = [dims0[0], dims0[1], dims0[2]];
-      free(cast(void*)dims0.ptr);
+      // [N, 6] outputs are read as [1, N, 6]
+      if (dcount0 != 2 && dcount0 != 3)
+         throw new Exception(format("Unsupported model output with %s dimensions", dcount0));
+
+      long[3] dims0 = 1;
+      ort.GetDimensions(sh0, dims0.ptr + (3 - dcount0), dcount0).validate();
+      outDims = dims0;
    }
 
    // Scale the picture to fit the model input, pad with gray and convert to a CHW float tensor
@@ -674,7 +725,8 @@ struct AI
       auto nw = max(1, cast(int)(iw*scale));
       auto nh = max(1, cast(int)(ih*scale));
 
-      auto tensor = new float[3 * h * w];
+      // A little room at the end: the scaler may write a few bytes past the last row
+      auto tensor = (new float[3 * h * w + 64])[0 .. 3 * h * w];
       tensor[] = 128.0f / 255.0f;
 
       // FFmpeg's libswscale (if installed) scales and writes the floats in one pass
