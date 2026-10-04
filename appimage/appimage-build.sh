@@ -21,5 +21,9 @@ chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
 # Copy the application binary to the AppDir
 cp ../output/bin/etichetta AppDir/usr/bin/
 
+# The WebGPU plugin is loaded at runtime, linuxdeploy can't find it by itself
+mkdir -p AppDir/usr/lib
+cp ../ext/onnx/lib/libonnxruntime_providers_webgpu.so AppDir/usr/lib/
+
 # Run the build
 DEPLOY_GTK_VERSION=3 ./linuxdeploy-x86_64.AppImage --plugin gtk -i ../res/etichetta.svg -d ../res/etichetta.desktop --appdir=AppDir --output appimage

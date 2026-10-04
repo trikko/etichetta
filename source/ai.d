@@ -29,10 +29,9 @@ import std;
 import onnxruntime;
 import common;
 
-import dcv.core;
+import gdkpixbuf.Pixbuf : Pixbuf;
 
-import mir.ndslice, mir.rc;
-import mir.appender;
+import mir.ndslice;
 
 import common : Rectangle, Point;
 import glib.Idle;
@@ -86,6 +85,7 @@ struct AI
 
       const(OrtApi)* ort = null;
       OrtEnv* env;
+      OrtEpDevice* webgpuDevice;   // GPU used by the WebGPU plugin (Vulkan, Direct3D 12 or Metal)
       OrtSession* session;
       OrtMemoryInfo* memory_info;
       OrtValue*[1] output_tensors;
@@ -106,9 +106,21 @@ struct AI
          info("Found onnxruntime ", ortbase.GetVersionString().to!string);
 
          ort = ortbase.GetApi(ORT_API_VERSION);
+
+         // An older library doesn't support the API version we were built with
+         if (ort is null)
+         {
+            warning("onnxruntime is too old, version 1.24 or later is needed");
+            return;
+         }
+
          hasAI = true;
       }
-      else warning("Can't load onnx libraries");
+      else
+      {
+         warning("Can't load onnx libraries");
+         return;
+      }
 
       ort.CreateEnv(OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR, "etichetta", &env).validate();
 
@@ -155,6 +167,66 @@ struct AI
          }
       }
 
+
+      registerWebGPU();
+   }
+
+   // The WebGPU plugin gives GPU acceleration on any vendor. It's a separate library, loaded if found.
+   private void registerWebGPU()
+   {
+      version(Windows) immutable plugin = "onnxruntime_providers_webgpu.dll";
+      else version(OSX) immutable plugin = "libonnxruntime_providers_webgpu.dylib";
+      else immutable plugin = "libonnxruntime_providers_webgpu.so";
+
+      auto exeDir = dirName(thisExePath);
+      auto candidates = [
+         buildPath(exeDir, plugin),                                  // Windows
+         buildPath(exeDir, "..", "lib", plugin),                     // AppImage, Flatpak
+         buildPath(exeDir, "..", "..", "ext", "onnx", "lib", plugin), // Development build
+         buildPath("/usr/local/lib", plugin)                         // Installed by tools/setup
+      ];
+
+      auto found = std.algorithm.iteration.filter!(c => exists(c))(candidates);
+      if (found.empty)
+      {
+         info("WebGPU plugin not found");
+         return;
+      }
+
+      try
+      {
+         auto path = found.front.absolutePath.buildNormalizedPath;
+
+         version(Windows) ort.RegisterExecutionProviderLibrary(env, "webgpu", cast(Parameters!(typeof(OrtApi.RegisterExecutionProviderLibrary))[2]) path.toUTF16z).validate();
+         else ort.RegisterExecutionProviderLibrary(env, "webgpu", path.toStringz).validate();
+
+         OrtEpDevice** devices;
+         size_t count;
+         ort.GetEpDevices(env, &devices, &count).validate();
+
+         foreach (d; devices[0 .. count])
+         {
+            if (ort.EpDevice_EpName(d).fromStringz == "WebGpuExecutionProvider")
+            {
+               webgpuDevice = d;
+               break;
+            }
+         }
+
+         if (webgpuDevice is null)
+         {
+            info("WebGPU plugin loaded, but no GPU found");
+            return;
+         }
+
+         // Native GPU providers (CUDA, ...) are usually faster: WebGPU goes right after them
+         auto pos = availableExecProviders.countUntil!(p => p[0] == "Dnnl" || p[0] == "CPU");
+         if (pos < 0) pos = availableExecProviders.length;
+         availableExecProviders = availableExecProviders[0 .. pos] ~ ExecutionProvider("WebGPU", null) ~ availableExecProviders[pos .. $];
+
+         info("Found WebGPU provider");
+      }
+      catch (Exception e) { warning("Can't load WebGPU plugin: ", e.msg); }
    }
 
    void unload()
@@ -206,7 +278,10 @@ struct AI
                {
                   auto found = std.algorithm.searching.find!(p => p[0] == selected)(availableExecProviders);
                   if (found.empty) throw new Exception("provider not available");
-                  found.front[1](session_options, 0).validate();
+
+                  // Plugins are added through their device, the others through their own function
+                  if (selected == "WebGPU") ort.SessionOptionsAppendExecutionProvider_V2(session_options, env, &webgpuDevice, 1, null, null, 0).validate();
+                  else found.front[1](session_options, 0).validate();
                }
 
                // ORTCHAR_T is wchar_t on Windows, char elsewhere
@@ -300,25 +375,11 @@ struct AI
    {
       assert(hasAI);
 
-      import mir.algorithm.iteration : minIndex, maxIndex;
       import picture : Picture;
       assert(session !is null);
 
-      // Pixbuf rows may be padded and may have an alpha channel: copy to a packed RGB buffer
-      auto pb = Picture.pixbuf;
-      auto pixels = cast(ubyte[])pb.getPixelsWithLength();
-      auto channels = pb.getNChannels();
-      auto rowstride = pb.getRowstride();
-
-      auto rgb = new ubyte[Picture.width * Picture.height * 3];
-      foreach (y; 0 .. Picture.height)
-         foreach (x; 0 .. Picture.width)
-            rgb[(y * Picture.width + x) * 3 .. (y * Picture.width + x) * 3 + 3] = pixels[y * rowstride + x * channels .. y * rowstride + x * channels + 3];
-
-      Slice!(ubyte*, 3) imSlice = rgb.sliced(Picture.height, Picture.width, 3);
-
       float scale;
-      auto impr = letterBoxAndPreprocess(imSlice, scale);//preprocess(imSlice);
+      auto impr = letterBoxAndPreprocess(Picture.pixbuf, scale);
 
       import core.thread;
       import glib.Idle;
@@ -353,7 +414,7 @@ struct AI
          }
 
          // only one scale value is enough with a letterbox image.
-         candidates ~= Rectangle(Point(d.x1/scale/imSlice.shape[1], d.y1/scale/imSlice.shape[0]), Point(d.x2/scale/imSlice.shape[1], d.y2/scale/imSlice.shape[0]), labelsMap[d.cls], d.score);
+         candidates ~= Rectangle(Point(d.x1/scale/Picture.width, d.y1/scale/Picture.height), Point(d.x2/scale/Picture.width, d.y2/scale/Picture.height), labelsMap[d.cls], d.score);
       }
 
       // Non-maximum suppression: best scores first, a box is dropped if it overlaps too much
@@ -572,29 +633,46 @@ struct AI
       free(cast(void*)dims0.ptr);
    }
 
-   Slice!(RCI!float, 3) letterBoxAndPreprocess(InputSlice)(InputSlice img, out float scale){
+   // Scale the picture to fit the model input, pad with gray and convert to a CHW float tensor
+   float[] letterBoxAndPreprocess(Pixbuf img, out float scale)
+   {
       import std.algorithm.comparison : min;
-      import dcv.imgproc : resize;
-      static assert(InputSlice.N == 3, "only RGB color images are supported");
+      import gdkpixbuf.c.types : GdkInterpType;
 
       size_t w = inputW;
       size_t h = inputH;
 
-      auto iw = img.shape[1];
-      auto ih = img.shape[0];
+      auto iw = img.getWidth();
+      auto ih = img.getHeight();
       scale = min((cast(float)w)/iw, (cast(float)h)/ih);
       auto nw = cast(int)(iw*scale);
       auto nh = cast(int)(ih*scale);
 
-      auto resized = resize(img, [nh, nw]);
+      // GdkPixbuf does the resize (in C, way faster than doing it here)
+      auto resized = img.scaleSimple(nw, nh, GdkInterpType.BILINEAR);
+      scope(exit) resized.unref();
 
-      auto boxed_image = rcslice!float([h, w, 3], 128.0f); // allocates
-      boxed_image[0..nh, 0..nw, 0..$] = resized[0..nh, 0..nw, 0..$].as!float; // assign values from a lazy iter
+      // Rows may be padded and there may be an alpha channel
+      auto pixels = cast(ubyte[])resized.getPixelsWithLength();
+      auto channels = resized.getNChannels();
+      auto rowstride = resized.getRowstride();
 
-      auto image_data_t = (boxed_image / 255.0f).transposed!(2, 0, 1); // lazy
+      auto tensor = new float[3 * h * w];
+      tensor[] = 128.0f / 255.0f;
 
-      return image_data_t.rcslice; // allocates from the lazy slice
+      foreach (y; 0 .. nh)
+      {
+         auto row = pixels[y * rowstride .. $];
+         foreach (x; 0 .. nw)
+         {
+            auto p = row[x * channels .. x * channels + 3];
+            tensor[0 * h * w + y * w + x] = p[0] / 255.0f;
+            tensor[1 * h * w + y * w + x] = p[1] / 255.0f;
+            tensor[2 * h * w + y * w + x] = p[2] / 255.0f;
+         }
+      }
 
+      return tensor;
    }
 
 }

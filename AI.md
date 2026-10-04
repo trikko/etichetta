@@ -49,6 +49,11 @@ To export a model with [Ultralytics](https://docs.ultralytics.com/modes/export/)
 yolo export model=yolo11s.pt format=onnx
 ```
 
+## GPU acceleration
+Etichetta runs the model on the GPU through WebGPU, which uses Vulkan on Linux, Direct3D 12 on Windows and Metal on macOS: it works with AMD, Intel and NVIDIA cards, no extra drivers needed. If a CUDA build of onnxruntime is installed, CUDA is used instead.
+
+`Use GPU acceleration` in `Edit > AI settings...` is on by default and Etichetta remembers your choice. If the GPU can't be used, the model runs on CPU.
+
 ## Train your own model
 Once you have annotated some images, you can train a model on them and use it to annotate the rest. `tools/train.py` does everything starting from your Etichetta project folder: it splits the images in training and validation sets, trains a YOLO model with [Ultralytics](https://docs.ultralytics.com) and exports it to ONNX.
 

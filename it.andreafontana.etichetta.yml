@@ -26,49 +26,39 @@ modules:
       - type: archive
         dest: onnx
         only-arches: [x86_64]
-        url: https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x64-1.17.3.tgz
-        sha256: f2f11f9da1e3e19b22a8b378b9af57a58433f40e3db6a803e75c0ec0eba97a20
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.30.0/onnxruntime-linux-x64-1.30.0.tgz
+        sha256: a5ed5a3cac51fbb2e90da632ae43d19212faaa20e76484e62bcb7c23ddb3b3fd
 
       - type: archive
         dest: onnx
         only-arches: [aarch64]
-        url: https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-aarch64-1.17.3.tgz
-        sha256: 9f801577bd99676d1d821022e52b1f4554f56339ae3606c7b5ff3155f443c921
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.30.0/onnxruntime-linux-aarch64-1.30.0.tgz
+        sha256: e16a27a8ed330bbc698df7330b0cf56e722f354e3bcc92118682c74ef3c3e3da
+
+      # WebGPU plugin (GPU acceleration through Vulkan): published only as a Python wheel
+      - type: archive
+        archive-type: zip
+        dest: webgpu
+        only-arches: [x86_64]
+        url: https://files.pythonhosted.org/packages/c1/96/2a18a45079250afcd825687aef2895de266d5abc1cff9f52d2dede7598f2/onnxruntime_ep_webgpu-0.4.0-py3-none-manylinux_2_28_x86_64.whl
+        sha256: 5d8c961eda91a88961cad1fb7621f389f006b18497d6ea9ecf96f729f066cbfb
+
+      - type: archive
+        archive-type: zip
+        dest: webgpu
+        only-arches: [aarch64]
+        url: https://files.pythonhosted.org/packages/4e/ca/00c70322c19913c81a6bb2239aca83781b97a818b55c2ec3d25cec72dc4c/onnxruntime_ep_webgpu-0.4.0-py3-none-manylinux_2_28_aarch64.whl
+        sha256: 17f660db53b1a509c63e721ac6784a2daa1c4e91a968523ee9986505ee5b0a55
 
     build-commands:
       - mkdir -p /app/lib /app/include
-      - cp -P onnx/lib/libonnxruntime.so* /app/lib/
+      - cp -P onnx/lib/libonnxruntime.so* onnx/lib/libonnxruntime_providers_shared.so /app/lib/
       - cp -r onnx/include/* /app/include/
+      - install -Dm755 webgpu/libonnxruntime_providers_webgpu.so /app/lib/libonnxruntime_providers_webgpu.so
 
   - name: etichetta
     buildsystem: simple
-
-
-    ##     Fetching dplug 13.4.9 (getting selected version)
-    ##     Fetching mir-algorithm 3.22.4 (getting selected version)
-    ##     Fetching dvector 0.0.5 (getting selected version)
-    ##     Fetching bcaa 0.0.9 (getting selected version)
-    ##     Fetching intel-intrinsics 1.14.2 (getting selected version)
-
     sources:
-      - type: git
-        url: https://github.com/AuburnSounds/intel-intrinsics.git 
-        tag: v1.14.2
-        commit: 9607882c11fc8756504c69dc44af87f4065964bb
-        dest: deps/intel-intrinsics
-
-      - type: git
-        url: https://github.com/AuburnSounds/dplug.git 
-        tag: v13.4.9
-        commit: 1b18b122c5afdddef7a3c7153170df5446516dd9
-        dest: deps/dplug
-
-      - type: git
-        url: https://github.com/aferust/bcaa.git
-        tag: v0.0.9
-        commit: 10b0a1dc262733f90057666a812b70931b7dc76f
-        dest: deps/bcaa
-
       - type: git
         url: https://github.com/libmir/mir-core.git
         tag: v1.7.4
@@ -82,34 +72,10 @@ modules:
         dest: deps/mir-algorithm
 
       - type: git
-        url: https://github.com/libmir/mir-random.git
-        tag: v2.2.19
-        commit: c38881dc5264c5ee148ae51e7648d48da5dda520
-        dest: deps/mir-random
-
-      - type: git
-        url: https://github.com/libmir/mir-linux-kernel.git
-        tag: v1.2.1
-        commit: 76220f087a9535c2ebcc23708c6fcea01f7dc43c
-        dest: deps/mir-linux-kernel
-
-      - type: git
-        url: https://github.com/aferust/dvector.git
-        tag: v0.0.5
-        commit: 79e5d8902194d2898f0924ec45ff11b620dcdc72
-        dest: deps/dvector
-
-      - type: git
         url: https://gitlab.com/AntonMeep/silly.git
         tag: v1.1.1
         commit: 9c7743d73b7dae6c7ec841fe719d0a04a99096b9
         dest: deps/silly
-
-      - type: git
-        url: https://github.com/libmir/dcv.git
-        # Same commit used by dub.json
-        commit: 51c1147092006c64e875eef6311abb62e6eb92b5
-        dest: deps/dcv
 
       - type: git
         url: https://github.com/gtkd-developers/GtkD.git
@@ -122,26 +88,16 @@ modules:
         tag: v0.1.6
         commit: f0f17bec7c828eebd90ddb4457c43a7a6c414dbd
     build-commands:
-    
       # We need ext/onnx to exist for dub.json paths
       - mkdir -p ext/onnx
       - cp -r /app/include ext/onnx/include
       - cp -r /app/lib ext/onnx/lib
       # Build the app
       - rm -f dub.selections.json
-      # dcv is a git dependency in dub.json: point it to the local checkout
-      - |
-        sed -i 's#"repository": "git+https://github.com/libmir/dcv", "version": "51c1147"#"path": "deps/dcv"#' dub.json
       - dub add-local --system deps/mir-core
       - dub add-local --system deps/mir-algorithm
-      - dub add-local --system deps/mir-random
-      - dub add-local --system deps/mir-linux-kernel
-      - dub add-local --system deps/dvector
       - dub add-local --system deps/silly
       - dub add-local --system deps/gtk-d
-      - dub add-local --system deps/bcaa
-      - dub add-local --system deps/intel-intrinsics
-      - dub add-local --system deps/dplug
       - dub build --compiler=ldc2 --build=release --skip-registry=all
       # Install
       - install -Dm755 output/bin/etichetta /app/bin/etichetta
