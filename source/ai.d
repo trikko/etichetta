@@ -325,6 +325,7 @@ struct AI
       }
 
       size_t unknown = 0;
+      Rectangle[] candidates;
 
       foreach (d; decode(outSlice, format, minConfidence))
       {
@@ -336,47 +337,28 @@ struct AI
          }
 
          // only one scale value is enough with a letterbox image.
-         auto candidate = Rectangle(Point(d.x1/scale/imSlice.shape[1], d.y1/scale/imSlice.shape[0]), Point(d.x2/scale/imSlice.shape[1], d.y2/scale/imSlice.shape[0]), labelsMap[d.cls], d.score);
+         candidates ~= Rectangle(Point(d.x1/scale/imSlice.shape[1], d.y1/scale/imSlice.shape[0]), Point(d.x2/scale/imSlice.shape[1], d.y2/scale/imSlice.shape[0]), labelsMap[d.cls], d.score);
+      }
 
+      // Non-maximum suppression: best scores first, a box is dropped if it overlaps too much
+      // a box with the same label that is already in the picture (drawn by hand or kept before)
+      candidates.sort!((a, b) => a.score > b.score);
+
+      foreach (candidate; candidates)
+      {
          bool toAdd = true;
 
-         foreach(idx, b; Picture.rects)
+         foreach (idx, b; Picture.rects)
          {
-            // Check if candidate and b intersect
-
-            bool intersect = (
-               !(candidate.p2.x < b.p1.x || candidate.p1.x > b.p2.x) &&
-               !(candidate.p2.y < b.p1.y || candidate.p1.y > b.p2.y)
-            );
-
-            if (!intersect)
+            if (b.label != candidate.label || iou(b, candidate) <= maxOverlapping)
                continue;
 
-            auto allx = [b.p1.x, b.p2.x, candidate.p1.x, candidate.p2.x].sort;
-            auto ally = [b.p1.y, b.p2.y, candidate.p1.y, candidate.p2.y].sort;
+            // Boxes drawn by hand have score = float.max and are never replaced
+            if (b.score < candidate.score)
+               Picture.rects[idx] = candidate;
 
-            auto leftX = allx[1] - allx[0];
-            auto intersectX = allx[2] - allx[1];
-            auto rightX = allx[3] - allx[2];
-
-            auto leftY = ally[1] - ally[0];
-            auto intersectY = ally[2] - ally[1];
-            auto rightY = ally[3] - ally[2];
-
-            // Are they the same box?
-            if (
-               b.label == candidate.label &&
-               leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
-               leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
-            )
-            {
-               if(b.score < candidate.score)
-                     Picture.rects[idx] = candidate;
-
-               toAdd = false;
-               break;
-            }
-
+            toAdd = false;
+            break;
          }
 
          if (toAdd)
@@ -384,6 +366,28 @@ struct AI
       }
 
       return;
+   }
+
+   // Intersection over union of two boxes
+   double iou(in Rectangle a, in Rectangle b)
+   {
+      import std.algorithm.comparison : min, max;
+
+      // Corners may be swapped if the box was drawn from bottom-right
+      auto ax1 = min(a.p1.x, a.p2.x), ax2 = max(a.p1.x, a.p2.x), ay1 = min(a.p1.y, a.p2.y), ay2 = max(a.p1.y, a.p2.y);
+      auto bx1 = min(b.p1.x, b.p2.x), bx2 = max(b.p1.x, b.p2.x), by1 = min(b.p1.y, b.p2.y), by2 = max(b.p1.y, b.p2.y);
+
+      auto w = min(ax2, bx2) - max(ax1, bx1);
+      auto h = min(ay2, by2) - max(ay1, by1);
+
+      if (w <= 0 || h <= 0)
+         return 0;
+
+      auto intersection = w * h;
+      auto areaA = (ax2 - ax1) * (ay2 - ay1);
+      auto areaB = (bx2 - bx1) * (by2 - by1);
+
+      return intersection / (areaA + areaB - intersection);
    }
 
    // Guess the output layout from its shape and the number of classes in the labels file

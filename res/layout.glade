@@ -12,7 +12,7 @@
   </object>
   <object class="GtkAdjustment" id="adjOverlapping">
     <property name="upper">101</property>
-    <property name="value">90</property>
+    <property name="value">50</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
     <property name="page-size">1</property>
@@ -257,7 +257,7 @@
               <object class="GtkLabel">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
-                <property name="label" translatable="yes">Max overlapping (%)</property>
+                <property name="label" translatable="yes">Max overlap, IoU (%)</property>
                 <attributes>
                   <attribute name="weight" value="bold"/>
                 </attributes>
