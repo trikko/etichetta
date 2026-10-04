@@ -54,6 +54,8 @@ Etichetta runs the model on the GPU through WebGPU, which uses Vulkan on Linux, 
 
 `Use GPU acceleration` in `Edit > AI settings...` is on by default and Etichetta remembers your choice. If the GPU can't be used, the model runs on CPU.
 
+If FFmpeg is installed, pictures are scaled for the model with its `libswscale`, about twice as fast; otherwise with GdkPixbuf. The bottom of `AI settings...` shows what is in use.
+
 ## Train your own model
 Once you have annotated some images, you can train a model on them and use it to annotate the rest. `tools/train.py` does everything starting from your Etichetta project folder: it splits the images in training and validation sets, trains a YOLO model with [Ultralytics](https://docs.ultralytics.com) and exports it to ONNX.
 

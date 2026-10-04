@@ -58,6 +58,7 @@ struct AI
    double maxOverlapping;
 
    ExecutionProvider[] availableExecProviders;
+   string activeProvider;  // Provider used by the loaded model
 
    // Output layouts we can decode. nc = number of classes.
    enum OutputFormat
@@ -169,6 +170,9 @@ struct AI
 
 
       registerWebGPU();
+
+      import scaler : Swscale;
+      Swscale.load();
    }
 
    // The WebGPU plugin gives GPU acceleration on any vendor. It's a separate library, loaded if found.
@@ -289,6 +293,7 @@ struct AI
                else ort.CreateSession(env, file.toStringz, session_options, &session).validate();
 
                info("PROVIDER SELECTED: ", selected);
+               activeProvider = selected;
                break;
             }
             catch (Exception e)
@@ -648,6 +653,16 @@ struct AI
       auto nw = cast(int)(iw*scale);
       auto nh = cast(int)(ih*scale);
 
+      auto tensor = new float[3 * h * w];
+      tensor[] = 128.0f / 255.0f;
+
+      // FFmpeg's libswscale (if installed) scales and writes the floats in one pass
+      import scaler : Swscale;
+      auto src = cast(ubyte[])img.getPixelsWithLength();
+      if (Swscale.scaleToPlanarFloat(src.ptr, iw, ih, img.getRowstride(), img.getNChannels(), nw, nh,
+            tensor.ptr, tensor.ptr + h * w, tensor.ptr + 2 * h * w, cast(int)w))
+         return tensor;
+
       // GdkPixbuf does the resize (in C, way faster than doing it here)
       auto resized = img.scaleSimple(nw, nh, GdkInterpType.BILINEAR);
       scope(exit) resized.unref();
@@ -656,9 +671,6 @@ struct AI
       auto pixels = cast(ubyte[])resized.getPixelsWithLength();
       auto channels = resized.getNChannels();
       auto rowstride = resized.getRowstride();
-
-      auto tensor = new float[3 * h * w];
-      tensor[] = 128.0f / 255.0f;
 
       foreach (y; 0 .. nh)
       {

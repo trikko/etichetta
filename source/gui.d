@@ -454,6 +454,19 @@ struct GUI
 		auto hasGpu = AI.availableExecProviders.length > 0 && AI.availableExecProviders[0][0] != "CPU" && AI.availableExecProviders[0][0] != "Dnnl";
 		chkAIGpu.setSensitive = hasGpu;
 		chkAIGpu.setActive = hasGpu && Settings.get("gpu", "true") == "true";
+
+		// Show what is used, so the user can check it
+		import scaler : Swscale;
+		string gpu;
+		if (AI.hasModel) gpu = "Model running on: " ~ AI.activeProvider;
+		else if (hasGpu) gpu = "GPU acceleration: " ~ AI.availableExecProviders[0][0] ~ " available";
+		else gpu = "GPU acceleration: not available";
+
+		auto scaling = Swscale.available
+			? "Image scaling: FFmpeg libswscale " ~ Swscale.versionString
+			: "Image scaling: GdkPixbuf (FFmpeg libswscale not found)";
+
+		lblAIInfo.setText(gpu ~ "\n" ~ scaling);
 		btnAIOk.setSensitive(true);
 		btnAIOk.setLabel("Load");
 

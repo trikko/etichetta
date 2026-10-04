@@ -106,6 +106,7 @@ mixin GtkAttributes;
 @ui FileChooserButton fileAILabels;
 
 @ui CheckButton      chkAIGpu;
+@ui Label            lblAIInfo;
 
 @ui Entry			   search;
 @ui TreeView		   lstLabels;

@@ -288,6 +288,25 @@
                 <property name="position">7</property>
               </packing>
             </child>
+            <child>
+              <object class="GtkLabel" id="lblAIInfo">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="margin-bottom">10</property>
+                <property name="selectable">True</property>
+                <property name="wrap">True</property>
+                <attributes>
+                  <attribute name="style" value="italic"/>
+                  <attribute name="weight" value="light"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">8</property>
+              </packing>
+            </child>
           </object>
           <packing>
             <property name="expand">True</property>
