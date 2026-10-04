@@ -39,8 +39,6 @@ struct Picture
 	{
 		static:
 
-		Pixbuf	pixbuf;
-
 		Point		roiTopLeft;			// In the picture coords space
 		Point		roiBottomRight;	// In the picture coords space
 
@@ -65,9 +63,13 @@ struct Picture
 			if (!invalidated)
 				return result;
 
-
-			if (pixbuf !is null)
-				pixbuf.unref();
+			// Release the previous view now: the GC doesn't know how big pixbufs are and would
+			// let them pile up while zooming or resizing the window on large pictures
+			if (result !is null)
+			{
+				result.unref();
+				result = null;
+			}
 
 			// Calculate the crop area and expand it to fit the viewport proportions
 			double minCropW = roiBottomRight.x - roiTopLeft.x;
@@ -114,10 +116,12 @@ struct Picture
 
 			// Cache the result. If it's an upscale, use bilinear interpolation, otherwise use nearest. We want to see the pixels!
 			result = cropped.scaleSimple(
-				cast(int)(cropped.getWidth * scale),
-				cast(int)(cropped.getHeight * scale),
+				max(1, cast(int)(cropped.getWidth * scale)),
+				max(1, cast(int)(cropped.getHeight * scale)),
 				scale < 1 ? InterpType.BILINEAR : InterpType.NEAREST
 			);
+
+			cropped.unref();
 
 			offsetX = (width - result.getWidth) / 2;
 			offsetY = (height - result.getHeight) / 2;
@@ -404,10 +408,12 @@ struct Picture
 
 	bool readPictures()
 	{
+		// Reloading the same folder (F5) keeps the current picture, if it's still there
+		auto previous = list.length > 0 ? current : "";
 		list = listPictures(workingDirectory);
 
-		// Load the first one
-		index = 0;
+		auto found = list.countUntil(previous);
+		index = found >= 0 ? found : 0;
 		if (!loadCurrent())
 			return false;
 

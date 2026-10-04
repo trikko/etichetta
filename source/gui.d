@@ -526,6 +526,25 @@ struct GUI
 		return idx >= 0 && idx < labels.length ? labels[idx] : format("class %d", idx);
 	}
 
+	void actionAutoAnnotate()
+	{
+		import ai : AI;
+
+		if (status == State.ANNOTATING) return;
+		else if (!AI.hasModel) actionShowAISettings();
+		else
+		{
+			try
+			{
+				AI.boxes();
+				Picture.writeAnnotations();
+			}
+			catch (Exception e) { showError("AI annotation failed:\n" ~ e.msg); }
+
+			canvas.queueDraw();
+		}
+	}
+
 	void showError(string message)
 	{
 		import gtk.MessageDialog;
@@ -573,22 +592,7 @@ struct GUI
 
 			case GdkKeysyms.GDK_a, GdkKeysyms.GDK_A:
 
-				import ai : AI;
-
-				if (status == State.ANNOTATING) break;
-				else if (!AI.hasModel) actionShowAISettings();
-				else
-				{
-					try
-					{
-						AI.boxes();
-						Picture.writeAnnotations();
-					}
-					catch (Exception e) { showError("AI annotation failed:\n" ~ e.msg); }
-
-					canvas.queueDraw();
-				}
-
+				actionAutoAnnotate();
 				break;
 			case GdkKeysyms.GDK_Return:
 				if (status == State.ANNOTATING)
@@ -604,6 +608,10 @@ struct GUI
 
 			case GdkKeysyms.GDK_0: .. case GdkKeysyms.GDK_9:
 				actionChangeLabel(key - GdkKeysyms.GDK_0);
+				break;
+
+			case GdkKeysyms.GDK_KP_0: .. case GdkKeysyms.GDK_KP_9:
+				actionChangeLabel(key - GdkKeysyms.GDK_KP_0);
 				break;
 
 			case GdkKeysyms.GDK_space:
@@ -646,7 +654,8 @@ struct GUI
 				break;
 
 			case GdkKeysyms.GDK_Shift_L:
-				actionStartZoomDrawing();
+				// Not with Ctrl: Ctrl+Shift+C/V are copy and paste
+				if (!isCtrlPressed) actionStartZoomDrawing();
 				break;
 
 			case GdkKeysyms.GDK_F5:
@@ -901,6 +910,14 @@ struct GUI
 		{
 			mnuUndo.setSensitive(Picture.historyIndex > 0);
 			mnuRedo.setSensitive(Picture.historyIndex < Picture.history.length - 1);
+
+			// Boxes may have been added or removed (paste, AI, undo, ...)
+			mnuDeleteAnnotation.setSensitive(Picture.rects.length > 0);
+			mnuNextAnnotation.setSensitive(Picture.rects.length > 1);
+			mnuPrevAnnotation.setSensitive(Picture.rects.length > 1);
+
+			// A box being moved may not exist anymore
+			if (isGrabbing && Picture.rects.length == 0) { isGrabbing = false; grabIndex = -1; }
 		}
 	}
 
@@ -940,6 +957,8 @@ struct GUI
 			{
 				isGrabbing = false;
 				grabIndex = -1;
+
+				if (Picture.rects.length == 0) return true;
 
 				// Sort p1 and p2
 				Point p1 = Point(min(Picture.rects[0].p1.x, Picture.rects[0].p2.x), min(Picture.rects[0].p1.y, Picture.rects[0].p2.y));
@@ -1057,6 +1076,8 @@ struct GUI
 		{
 
 			auto normalized = Point(coords.x / Picture.width, coords.y / Picture.height);
+
+			if (isGrabbing && Picture.rects.length == 0) { isGrabbing = false; grabIndex = -1; }
 
 			if (isGrabbing)
 			{
@@ -1296,10 +1317,12 @@ struct GUI
 			remove(tmpLogo);
 		}
 
-		fileAILabels.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
-		fileAIModel.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
-		fileImagesDir.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
-		fileVideo.addOnButtonPress( (Event e, Widget w){ resetCurrentDirectory(fileAILabels.getCurrentFolder); return false; } );
+		// Remember the folder of the last file picked, in every chooser
+		import gtk.FileChooserButton : FileChooserButton;
+		fileAILabels.addOnFileSet( (FileChooserButton b){ resetCurrentDirectory(b.getCurrentFolder); } );
+		fileAIModel.addOnFileSet( (FileChooserButton b){ resetCurrentDirectory(b.getCurrentFolder); } );
+		fileImagesDir.addOnFileSet( (FileChooserButton b){ resetCurrentDirectory(b.getCurrentFolder); } );
+		fileVideo.addOnFileSet( (FileChooserButton b){ resetCurrentDirectory(b.getCurrentFolder); } );
 
 		mainWindow.setIcon(logo);
 		mainWindow.setTitle("Etichetta " ~ VERSION_STRING ~ " - GitHub: trikko/etichetta");
@@ -1315,7 +1338,7 @@ struct GUI
 			int size;
 			int interval;
 
-			try {size = std.conv.to!int(maxImageDimension.getText);} catch(Exception e) { size = 0; }
+			try {size = std.conv.to!int(maxFrameDimension.getText);} catch(Exception e) { size = 0; }
 			try {interval = std.conv.to!int(frameInterval.getText);} catch(Exception e) { interval = 0; }
 
 			if (video.empty || size == 0 || interval == 0)
@@ -1337,7 +1360,12 @@ struct GUI
 
 					auto outputDir = buildPath(dirName(video), video.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
 
-					Idle.add(&extractResult, idleValue(extractFrames(video, outputDir, interval, size)));
+					// Any failure must reach the GUI, or the Extract button would stay disabled
+					FfmpegError result;
+					try result = extractFrames(video, outputDir, interval, size);
+					catch (Exception e) { warning("Extraction failed: ", e.msg); result = FfmpegError.FFMPEG_ERROR; }
+
+					Idle.add(&extractResult, idleValue(result));
 				}).start();
 			}
 
@@ -1373,26 +1401,20 @@ struct GUI
 				new Thread({
 					import glib.Idle;
 
-					extern(C) int resize (void* data)
-					{
-						import core.stdc.stdlib : free;
-						scope(exit) free(data);
-						double fraction = *(cast(double*)data);
-
-						if (fraction < 0) wndResize.hide();
-						else pbResize.setFraction(fraction);
-						return 0;
-					}
-
 					auto newFolder = buildPath(folder, "..", folder.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
-					auto entries = dirEntries(folder, "*.{jpg,jpeg,png}", SpanMode.shallow).array;
+					ResizeProgress progress;
 
-					double rp = 0;
-
-					if (entries.length > 0)
+					try
 					{
+						// Extensions in any case: .JPG files too
+						auto entries = dirEntries(folder, SpanMode.shallow)
+							.filter!(f => [".jpg", ".jpeg", ".png"].canFind(f.name.extension.toLower))
+							.array;
 
-						try {mkdirRecurse(newFolder);} catch(Exception e) { }
+						progress.total = entries.length;
+
+						if (entries.length > 0)
+							mkdirRecurse(newFolder);
 
 						foreach(idx, f; entries)
 						{
@@ -1402,24 +1424,28 @@ struct GUI
 								break;
 							}
 
-							Pixbuf p = new Pixbuf(f.name);
+							// A picture that can't be read or written is counted and skipped
+							try
+							{
+								Pixbuf p = new Pixbuf(f.name);
+								scope(exit) destroy(p);
 
-							// Letterbox scaling into size*size square
-							auto ratio = cast(float)p.getWidth / p.getHeight;
-							auto newWidth = size;
-							auto newHeight = size;
+								// Letterbox scaling into size*size square
+								auto ratio = cast(float)p.getWidth / p.getHeight;
+								auto newWidth = size;
+								auto newHeight = size;
 
-							if (ratio > 1) newHeight = cast(int)(size / ratio);
-							else newWidth = cast(int)(size * ratio);
+								if (ratio > 1) newHeight = max(1, cast(int)(size / ratio));
+								else newWidth = max(1, cast(int)(size * ratio));
 
-							auto newPixbuf = p.scaleSimple(newWidth, newHeight, InterpType.BILINEAR);
+								auto newPixbuf = p.scaleSimple(newWidth, newHeight, InterpType.BILINEAR);
+								scope(exit) destroy(newPixbuf);
 
-							try {
 								string ext;
 								string[] keys;
 								string[] values;
 
-								if (f.name.extension == ".png")
+								if (f.name.extension.toLower == ".png")
 								{
 									ext = "png";
 									keys = ["compression"];
@@ -1434,19 +1460,21 @@ struct GUI
 
 								newPixbuf.savev(std.conv.to!string(buildPath(newFolder, f.name.baseName).asNormalizedPath), ext, keys, values);
 							}
-							catch(Exception e ) { warning("Can't save ", f.name, " to ", newFolder, ". Exception: ", e.msg); }
+							catch(Exception e ) { warning("Can't resize ", f.name, " to ", newFolder, ". Exception: ", e.msg); progress.failed++; }
 
-							destroy(newPixbuf);
-							destroy(p);
-
-							rp = 1.0*idx/entries.length;
-
-							Idle.add(&resize, idleValue(rp));
+							progress.done = idx + 1;
+							Idle.add(&resizeProgress, idleValue(progress));
 						}
-
-						rp = -1;
-						Idle.add(&resize, idleValue(rp));
 					}
+					catch (Exception e)
+					{
+						warning("Resize failed: ", e.msg);
+						progress.error = true;
+					}
+
+					// Always tell the GUI we are done, or the Resize button would stay disabled
+					progress.finished = true;
+					Idle.add(&resizeProgress, idleValue(progress));
 				}).start();
 			}
 
@@ -1551,6 +1579,9 @@ struct GUI
 		mainWindow.addOnKeyRelease(toDelegate(&onKeyRelease));	// Key release
 		mainWindow.addOnKeyPress(toDelegate(&onKeyPress));			// Key press
 
+		// The Shift release may go to another window (e.g. Shift+L opens the labels list): stop zooming
+		mainWindow.addOnFocusOut( (Event e, Widget w) { isZooming = false; zoomLines.length = 0; canvas.queueDraw(); return false; } );
+
 
 		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; wndExtract.showAll(); lblProgress.setVisible(false); return true; }); // Resize images
 		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
@@ -1572,6 +1603,7 @@ struct GUI
 		mnuToggleZoom.addOnButtonPress( (Event e, Widget w){ actionToggleZoom(); return true; } );
 		mnuCancelAnnotation.addOnButtonPress( (Event e, Widget w){ actionEditingMode(); return true; } );
 		mnuDeleteAnnotation.addOnButtonPress( (Event e, Widget w){ actionDeleteRect(); return true; } );
+		mnuAuto.addOnButtonPress( (Event e, Widget w){ actionAutoAnnotate(); return true; } );
 
 		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndo(); return true; } );
 		mnuRedo.addOnButtonPress( (Event e, Widget w){ actionRedo(); return true; } );
@@ -1655,16 +1687,15 @@ struct GUI
 			}
 			else if (e.key.keyval == GdkKeysyms.GDK_Down)
 			{
+				// Nothing selected (no results) or already at the end: nothing to do
 				auto sel = lstLabels.getSelection().getSelected;
-				store.iterNext(sel);
-				lstLabels.getSelection().selectIter(sel);
+				if (sel !is null && store.iterNext(sel)) lstLabels.getSelection().selectIter(sel);
 				return true;
 			}
 			else if (e.key.keyval == GdkKeysyms.GDK_Up)
 			{
 				auto sel = lstLabels.getSelection().getSelected;
-				store.iterPrevious(sel);
-				lstLabels.getSelection().selectIter(sel);
+				if (sel !is null && store.iterPrevious(sel)) lstLabels.getSelection().selectIter(sel);
 				return true;
 			}
 
@@ -1726,6 +1757,39 @@ struct GUI
 		FFMPEG_KILLED
 	}
 
+	struct ResizeProgress
+	{
+		// Plain values only: it's copied with malloc, where the GC can't see pointers
+		size_t done, total, failed;
+		bool finished, error;
+	}
+
+	extern(C) int resizeProgress(void* data)
+	{
+		import core.stdc.stdlib : free;
+		scope(exit) free(data);
+
+		auto p = *(cast(ResizeProgress*)data);
+
+		if (!p.finished)
+		{
+			pbResize.setFraction(p.total ? 1.0 * p.done / p.total : 0);
+			return 0;
+		}
+
+		btnResize.setSensitive = true;
+
+		if (p.error) showError("Can't resize the pictures: the folder can't be read or the new folder can't be created.");
+		else if (p.total == 0) showError("No pictures (png, jpg, jpeg) found in the selected folder.");
+		else
+		{
+			if (p.failed > 0) showError(format("%s of %s pictures could not be resized.", p.failed, p.total));
+			wndResize.hide();
+		}
+
+		return 0;
+	}
+
 	// Values passed to Idle callbacks from other threads: copied with malloc (the GC can't see
 	// pointers held by GLib) and freed by the callback
 	static T* idleValue(T)(T value)
@@ -1756,8 +1820,12 @@ struct GUI
 
 		auto r = *(cast(FfmpegError*)result);
 
+		// Killed by Cancel: the window is already closed
 		if (r == FfmpegError.FFMPEG_KILLED) { return 0; }
-		else if (r == FfmpegError.NO_ERROR) wndExtract.hide();
+
+		btnExtract.setSensitive = true;
+
+		if (r == FfmpegError.NO_ERROR) wndExtract.hide();
 		else
 		{
 			string msg;
@@ -1779,8 +1847,6 @@ struct GUI
 
 	FfmpegError extractFrames(string videoPath, string outputDir, ulong delayMs, ulong maxDimension)
 	{
-		cancelExtract = false;
-
 		// Check if ffmpeg exists
 		if (executeShell("ffmpeg -progress - -h").status != 0)
 			return FfmpegError.FFMPEG_NOT_FOUND;
@@ -1802,16 +1868,16 @@ struct GUI
 			"-qscale:v", "2", buildPath(outputDir, "frame%06d.jpg")
 		];
 
-		auto pipe = pipeProcess(cmd);
+		// Only stdout (the progress) is read: a piped stderr nobody reads could fill and block ffmpeg
+		auto pipe = pipeProcess(cmd, Redirect.stdout);
 
 		while(true)
 		{
 			if (cancelExtract)
 			{
-				pipe.stderr.close();
-				pipe.stdin.close();
-				pipe.stdout.close();
 				pipe.pid.kill();
+				pipe.stdout.close();
+				pipe.pid.wait();
 
 				return FfmpegError.FFMPEG_KILLED;
 			}
@@ -1819,12 +1885,14 @@ struct GUI
 			auto line = pipe.stdout.readln('\n');
 			if (line.length == 0) break;
 
-			if (line.canFind("out_time="))
+			// Microseconds processed. It can be N/A or negative at the beginning: skip those.
+			if (line.startsWith("out_time_us="))
 			{
-				auto parts = line.split("=");
-				auto time = parts[1].strip().split(".")[0].split(":");
+				long us;
+				try us = line["out_time_us=".length .. $].strip.to!long;
+				catch (Exception e) continue;
 
-				auto processed = time[0].to!ulong*60*60 + time[1].to!ulong*60 + time[2].to!ulong;
+				ulong processed = us > 0 ? us / 1_000_000 : 0;
 
 				if(processed > 0)
 				{
