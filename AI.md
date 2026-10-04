@@ -30,3 +30,21 @@ In this way, returning to the photos to be labeled and pressing the `A` key, all
 <img src="https://github.com/trikko/etichetta/assets/647157/5a9ff296-58bb-4850-b625-1fc74b67793e" width="480">
 
 Now all I have to do is simply adjust the proposed frame and press the `0` or `1` key to choose the right class (you see? the cat in the second photo is Goose). A nice difference compared to making all the rectangles from scratch!
+
+## Supported models
+Etichetta reads the output layout of the ONNX model and picks the right decoder by itself. These are the layouts it understands (all tested except YOLOv7, which shares the YOLOv5 layout):
+
+| Model | Output |
+|---|---|
+| YOLOv8, YOLO11, YOLOv10, YOLO26 (default Ultralytics export) | `[1, 4+classes, N]` |
+| YOLOv5 (from the original yolov5 repo), YOLOv7 | `[1, N, 5+classes]` |
+| YOLOv10 and YOLO26 end-to-end (`nms=False`), any Ultralytics export with `nms=True` | `[1, N, 6]` |
+| RT-DETR (Ultralytics) | `[1, N, 6]` |
+
+The labels file must have one line for each class the model knows, in the same order: Etichetta uses its length to recognize the layout.
+
+To export a model with [Ultralytics](https://docs.ultralytics.com/modes/export/):
+
+```bash
+yolo export model=yolo11s.pt format=onnx
+```

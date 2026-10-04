@@ -60,10 +60,29 @@ struct AI
 
    ExecutionProvider[] availableExecProviders;
 
+   // Output layouts we can decode. nc = number of classes.
+   enum OutputFormat
+   {
+      unknown,
+      yolov8,     // [1, 4+nc, N]: cx, cy, w, h, class scores (YOLOv8, YOLOv9, YOLO11, YOLO12)
+      yolov8T,    // [1, N, 4+nc]: same, transposed (RT-DETR, coordinates may be normalized)
+      yolov5,     // [1, N, 5+nc]: cx, cy, w, h, objectness, class scores (YOLOv5, YOLOv7)
+      endToEnd    // [1, N, 6]: x1, y1, x2, y2, score, class (YOLOv10/YOLO26 end-to-end, nms=True exports)
+                  //            or normalized cx, cy, w, h, score, class (RT-DETR)
+   }
+
+   // A detection in input tensor coordinates (pixels of the letterboxed image)
+   struct Detection
+   {
+      float x1, y1, x2, y2;
+      int   cls;
+      float score;
+   }
+
    private
    {
-      static immutable const(char)*[1] input_node_names = ["images".ptr];
-      static immutable const(char)*[1] output_node_names = ["output0"];
+      const(char)* inputName;
+      const(char)* outputName;
 
       const(OrtApi)* ort = null;
       OrtEnv* env;
@@ -193,6 +212,19 @@ struct AI
          size_t num_input_nodes;
          ort.SessionGetInputCount(session, &num_input_nodes).validate();
          ort.CreateCpuMemoryInfo(OrtAllocatorType.OrtArenaAllocator, OrtMemType.OrtMemTypeDefault, &memory_info).validate();
+
+         // Node names change between exporters ("output0", "output", ...): read them from the model
+         OrtAllocator* allocator;
+         ort.GetAllocatorWithDefaultOptions(&allocator).validate();
+
+         char* name;
+         ort.SessionGetInputName(session, 0, allocator, &name).validate();
+         inputName = name.fromStringz.idup.toStringz;
+         ort.AllocatorFree(allocator, name).validate();
+
+         ort.SessionGetOutputName(session, 0, allocator, &name).validate();
+         outputName = name.fromStringz.idup.toStringz;
+         ort.AllocatorFree(allocator, name).validate();
       }
       catch (Exception e)
       {
@@ -232,8 +264,9 @@ struct AI
 
       ort.GetDimensions(input_shape_info, input_dims.ptr, num_dims);
 
-      inputH = input_dims[3];
-      inputW = input_dims[2];
+      // NCHW. Models exported with dynamic shapes report -1: use the usual YOLO size.
+      inputH = input_dims[2] > 0 ? input_dims[2] : 640;
+      inputW = input_dims[3] > 0 ? input_dims[3] : 640;
 
       if (input_dims[1] != 3)
       {
@@ -255,7 +288,18 @@ struct AI
       import picture : Picture;
       assert(session !is null);
 
-      Slice!(ubyte*, 3) imSlice = (cast(ubyte[])Picture.pixbuf.getPixelsWithLength()).sliced(Picture.height, Picture.width, 3);
+      // Pixbuf rows may be padded and may have an alpha channel: copy to a packed RGB buffer
+      auto pb = Picture.pixbuf;
+      auto pixels = cast(ubyte[])pb.getPixelsWithLength();
+      auto channels = pb.getNChannels();
+      auto rowstride = pb.getRowstride();
+
+      auto rgb = new ubyte[Picture.width * Picture.height * 3];
+      foreach (y; 0 .. Picture.height)
+         foreach (x; 0 .. Picture.width)
+            rgb[(y * Picture.width + x) * 3 .. (y * Picture.width + x) * 3 + 3] = pixels[y * rowstride + x * channels .. y * rowstride + x * channels + 3];
+
+      Slice!(ubyte*, 3) imSlice = rgb.sliced(Picture.height, Picture.width, 3);
 
       float scale;
       auto impr = letterBoxAndPreprocess(imSlice, scale);//preprocess(imSlice);
@@ -272,81 +316,184 @@ struct AI
       infer(impr, outPtr, outDims, numberOfelements);
       scope Slice!(float*, 3) outSlice = outPtr[0..numberOfelements].sliced(outDims[0], outDims[1], outDims[2]);
 
+      auto format = detectFormat(outSlice, labels.length);
+
+      if (format == OutputFormat.unknown)
+      {
+         warning("Unsupported model output shape ", outDims, " with ", labels.length, " labels");
+         return;
+      }
+
       size_t unknown = 0;
 
-      foreach (i; 0 .. outSlice.shape[2]) {
-         auto classProbabilities = outSlice[0, 4 .. $, i];
-
-         auto maxClassLoc = classProbabilities.maxIndex[0];
-         auto maxScore = classProbabilities[maxClassLoc];
-
-         if (maxScore > minConfidence) {
-
-            // We don't have this class in the gui
-            if (cast(int)maxClassLoc !in labelsMap)
-            {
-               unknown++;
-               continue;
-            }
-
-            // Object detected with confidence higher than the threshold
-            // Extract bounding box coordinates
-            auto width = outSlice[0, 2, i]  ;
-            auto height = outSlice[0, 3, i] ;
-
-            auto x = outSlice[0, 0, i] - 0.5f * width;
-            auto y = outSlice[0, 1, i] - 0.5f * height;
-
-            // only one scale value is enough with a letterbox image.
-            auto candidate = Rectangle(Point(x/scale/imSlice.shape[1], y/scale/imSlice.shape[0]), Point((x+width)/scale/imSlice.shape[1], (y+height)/scale/imSlice.shape[0]), labelsMap[cast(int)maxClassLoc], maxScore);
-
-            bool toAdd = true;
-
-            foreach(idx, b; Picture.rects)
-            {
-               // Check if candidate and b intersect
-
-               bool intersect = (
-                  !(candidate.p2.x < b.p1.x || candidate.p1.x > b.p2.x) &&
-                  !(candidate.p2.y < b.p1.y || candidate.p1.y > b.p2.y)
-               );
-
-               if (!intersect)
-                  continue;
-
-               auto allx = [b.p1.x, b.p2.x, candidate.p1.x, candidate.p2.x].sort;
-               auto ally = [b.p1.y, b.p2.y, candidate.p1.y, candidate.p2.y].sort;
-
-               auto leftX = allx[1] - allx[0];
-               auto intersectX = allx[2] - allx[1];
-               auto rightX = allx[3] - allx[2];
-
-               auto leftY = ally[1] - ally[0];
-               auto intersectY = ally[2] - ally[1];
-               auto rightY = ally[3] - ally[2];
-
-               // Are they the same box?
-               if (
-                  b.label == candidate.label &&
-                  leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
-                  leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
-               )
-               {
-                  if(b.score < candidate.score)
-                        Picture.rects[idx] = candidate;
-
-                  toAdd = false;
-                  break;
-               }
-
-            }
-
-            if (toAdd)
-               Picture.rects ~= candidate;
+      foreach (d; decode(outSlice, format, minConfidence))
+      {
+         // We don't have this class in the gui
+         if (d.cls !in labelsMap)
+         {
+            unknown++;
+            continue;
          }
+
+         // only one scale value is enough with a letterbox image.
+         auto candidate = Rectangle(Point(d.x1/scale/imSlice.shape[1], d.y1/scale/imSlice.shape[0]), Point(d.x2/scale/imSlice.shape[1], d.y2/scale/imSlice.shape[0]), labelsMap[d.cls], d.score);
+
+         bool toAdd = true;
+
+         foreach(idx, b; Picture.rects)
+         {
+            // Check if candidate and b intersect
+
+            bool intersect = (
+               !(candidate.p2.x < b.p1.x || candidate.p1.x > b.p2.x) &&
+               !(candidate.p2.y < b.p1.y || candidate.p1.y > b.p2.y)
+            );
+
+            if (!intersect)
+               continue;
+
+            auto allx = [b.p1.x, b.p2.x, candidate.p1.x, candidate.p2.x].sort;
+            auto ally = [b.p1.y, b.p2.y, candidate.p1.y, candidate.p2.y].sort;
+
+            auto leftX = allx[1] - allx[0];
+            auto intersectX = allx[2] - allx[1];
+            auto rightX = allx[3] - allx[2];
+
+            auto leftY = ally[1] - ally[0];
+            auto intersectY = ally[2] - ally[1];
+            auto rightY = ally[3] - ally[2];
+
+            // Are they the same box?
+            if (
+               b.label == candidate.label &&
+               leftX/intersectX < 1-maxOverlapping && rightX/intersectX < 1-maxOverlapping &&
+               leftY/intersectY <1-maxOverlapping && rightY/intersectY < 1-maxOverlapping
+            )
+            {
+               if(b.score < candidate.score)
+                     Picture.rects[idx] = candidate;
+
+               toAdd = false;
+               break;
+            }
+
+         }
+
+         if (toAdd)
+            Picture.rects ~= candidate;
       }
 
       return;
+   }
+
+   // Guess the output layout from its shape and the number of classes in the labels file
+   OutputFormat detectFormat(S)(S output, size_t nc)
+   {
+      auto rows = output.shape[1];
+      auto cols = output.shape[2];
+
+      // [1, N, 6] with integer class ids in the last column. Checked first: with 1 or 2 classes
+      // the shape alone can't tell it from YOLOv5 or a transposed YOLOv8.
+      if (cols == 6)
+      {
+         bool integral = true;
+         foreach (i; 0 .. rows)
+         {
+            auto c = output[0, i, 5];
+            if (c != cast(int)c || c < 0 || c >= nc) { integral = false; break; }
+         }
+
+         if (integral) return OutputFormat.endToEnd;
+      }
+
+      if (rows == 4 + nc && cols != 4 + nc) return OutputFormat.yolov8;
+      if (cols == 5 + nc) return OutputFormat.yolov5;
+      if (cols == 4 + nc) return OutputFormat.yolov8T;
+
+      // Labels file doesn't match the model: few attributes and many candidates is the YOLOv8 layout,
+      // as before. Classes without a label are skipped.
+      if (rows > 4 && rows < cols) return OutputFormat.yolov8;
+
+      return OutputFormat.unknown;
+   }
+
+   // Extract the detections over the threshold, in input tensor coordinates
+   Detection[] decode(S)(S output, OutputFormat format, double threshold)
+   {
+      import mir.algorithm.iteration : maxIndex;
+
+      Detection[] result;
+
+      Detection fromCenter(float cx, float cy, float w, float h, size_t cls, float score)
+      {
+         return Detection(cx - 0.5f * w, cy - 0.5f * h, cx + 0.5f * w, cy + 0.5f * h, cast(int)cls, score);
+      }
+
+      final switch (format)
+      {
+         case OutputFormat.unknown:
+            break;
+
+         case OutputFormat.yolov8:
+            foreach (i; 0 .. output.shape[2])
+            {
+               auto scores = output[0, 4 .. $, i];
+               auto cls = scores.maxIndex[0];
+               if (scores[cls] > threshold)
+                  result ~= fromCenter(output[0, 0, i], output[0, 1, i], output[0, 2, i], output[0, 3, i], cls, scores[cls]);
+            }
+            break;
+
+         case OutputFormat.yolov8T:
+            // RT-DETR gives coordinates normalized to [0, 1]
+            bool normalized = true;
+            foreach (i; 0 .. output.shape[1])
+               foreach (j; 0 .. 4)
+                  if (output[0, i, j] > 1.5f) normalized = false;
+
+            float sx = normalized ? inputW : 1;
+            float sy = normalized ? inputH : 1;
+
+            foreach (i; 0 .. output.shape[1])
+            {
+               auto scores = output[0, i, 4 .. $];
+               auto cls = scores.maxIndex[0];
+               if (scores[cls] > threshold)
+                  result ~= fromCenter(output[0, i, 0] * sx, output[0, i, 1] * sy, output[0, i, 2] * sx, output[0, i, 3] * sy, cls, scores[cls]);
+            }
+            break;
+
+         case OutputFormat.yolov5:
+            foreach (i; 0 .. output.shape[1])
+            {
+               auto scores = output[0, i, 5 .. $];
+               auto cls = scores.maxIndex[0];
+               auto score = output[0, i, 4] * scores[cls];   // objectness * class probability
+               if (score > threshold)
+                  result ~= fromCenter(output[0, i, 0], output[0, i, 1], output[0, i, 2], output[0, i, 3], cls, score);
+            }
+            break;
+
+         case OutputFormat.endToEnd:
+            // YOLO gives corners in pixels, RT-DETR gives center and size normalized to [0, 1]
+            bool normalized = true;
+            foreach (i; 0 .. output.shape[1])
+               foreach (j; 0 .. 4)
+                  if (output[0, i, j] > 1.5f) normalized = false;
+
+            foreach (i; 0 .. output.shape[1])
+            {
+               if (output[0, i, 4] <= threshold) continue;
+
+               if (normalized)
+                  result ~= fromCenter(output[0, i, 0] * inputW, output[0, i, 1] * inputH, output[0, i, 2] * inputW, output[0, i, 3] * inputH, cast(size_t)output[0, i, 5], output[0, i, 4]);
+               else
+                  result ~= Detection(output[0, i, 0], output[0, i, 1], output[0, i, 2], output[0, i, 3], cast(int)output[0, i, 5], output[0, i, 4]);
+            }
+            break;
+      }
+
+      return result;
    }
 
    private void infer(InputSlice)(auto ref InputSlice impr, out float* outPtr, out long[3] outDims, out size_t ecount0)
@@ -381,8 +528,8 @@ struct AI
       ort.Run
       (
          session, null,
-         ["images".ptr].ptr, input_tensor.ptr, 1,
-         ["output0".ptr].ptr, 1, output_tensors.ptr
+         &inputName, input_tensor.ptr, 1,
+         &outputName, 1, output_tensors.ptr
       ).validate();
 
       ort.GetTensorMutableData(output_tensors[0], cast(void**)&outPtr).validate();
