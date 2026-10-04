@@ -447,7 +447,13 @@ struct GUI
 			return;
 		}
 
-		chkAIGpu.setActive = false;
+		// GPU acceleration is on by default when a GPU provider is available (WebGPU, CUDA, ...),
+		// unless the user turned it off. If the GPU fails, the model is loaded on CPU anyway.
+		// (Dnnl is a CPU library)
+		import settings : Settings;
+		auto hasGpu = AI.availableExecProviders.length > 0 && AI.availableExecProviders[0][0] != "CPU" && AI.availableExecProviders[0][0] != "Dnnl";
+		chkAIGpu.setSensitive = hasGpu;
+		chkAIGpu.setActive = hasGpu && Settings.get("gpu", "true") == "true";
 		btnAIOk.setSensitive(true);
 		btnAIOk.setLabel("Load");
 
@@ -1426,6 +1432,11 @@ struct GUI
 
 			auto model = fileAIModel.getFile().getPath();
 			auto labels = fileAILabels.getFile().getPath();
+
+			// Remember the user choice about GPU acceleration
+			import settings : Settings;
+			if (chkAIGpu.getSensitive)
+				Settings.set("gpu", chkAIGpu.getActive ? "true" : "false");
 
 			// Check if user selected a model file and a labels file
 			if (model.empty || labels.empty)
