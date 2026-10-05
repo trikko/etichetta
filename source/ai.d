@@ -95,12 +95,8 @@ struct AI
 
    void reinit()
    {
-      addWorkingDirectoryChangeCallback( (_) {
-         modelFile = "";
-         labelsFile = "";
-         labels = null;
-         labelsMap = null;
-      });
+      // The model stays loaded when the project changes or is reloaded: the GUI maps its labels
+      // to the labels of the new project (see GUI.mapAILabels)
 
       auto ortbase = OrtGetApiBase();
       if (ortbase)

@@ -50,6 +50,7 @@ mixin GtkAttributes;
 @ui Entry            maxImageDimension;
 
 @ui Label            lblProgress;
+@ui ProgressBar      pbExtract;
 @ui Button           btnExtractCancel;
 @ui Button           btnExtract;
 @ui FileChooserButton fileVideo;
@@ -106,6 +107,7 @@ mixin GtkAttributes;
 @ui FileChooserButton fileAILabels;
 
 @ui CheckButton      chkAIGpu;
+@ui CheckButton      chkShuffleFrames;
 @ui Label            lblAIInfo;
 
 @ui Entry			   search;

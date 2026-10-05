@@ -63,7 +63,6 @@ struct GUI
 	Cursor pencil;
 	Cursor hand;
 	Cursor handClosed;
-	Cursor editing;
 	Cursor[] directions;
 
 	Point				lastMouseCoords;
@@ -233,7 +232,7 @@ struct GUI
 	bool actionOpenDir()
 	{
 		// Let user choose a directory
-		auto dialog = new FileChooserDialog("Choose a directory", mainWindow, FileChooserAction.SELECT_FOLDER, ["Cancel", "Open"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
+		auto dialog = new FileChooserDialog("Open a project folder (with images and labels)", mainWindow, FileChooserAction.SELECT_FOLDER, ["Cancel", "Open"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
 		dialog.setModal(true);
 		dialog.setCurrentFolder(lastDirectory);
 		dialog.setTransientFor(mainWindow);
@@ -526,6 +525,33 @@ struct GUI
 		return idx >= 0 && idx < labels.length ? labels[idx] : format("class %d", idx);
 	}
 
+	// Match the model labels with the project labels by name. Returns false if none matches.
+	bool mapAILabels()
+	{
+		import ai : AI;
+
+		AI.labelsMap = null;
+
+		if (AI.hasAI && AI.hasModel)
+		{
+			int[string] guiLabels;
+			foreach(idx, l; labels)
+				guiLabels[l] = cast(int)idx;
+
+			foreach(idx, l; AI.labels)
+			{
+				if (l in guiLabels)
+				{
+					AI.labelsMap[cast(int)idx] = guiLabels[l];
+					debug info("Matching label (AI -> GUI): ", l, "(", idx ,") -> ", l, "(", guiLabels[l], ")");
+				}
+			}
+		}
+
+		mnuAuto.setSensitive(!AI.labelsMap.empty);
+		return !AI.labelsMap.empty;
+	}
+
 	void actionAutoAnnotate()
 	{
 		import ai : AI;
@@ -543,6 +569,56 @@ struct GUI
 
 			canvas.queueDraw();
 		}
+	}
+
+	// Cursor for drawing boxes: a thin crosshair with a gap in the middle, so the exact pixel stays
+	// visible. Black with a white border: it can be seen on dark and light pictures.
+	Cursor crosshairCursor()
+	{
+		enum size = 33, center = 16, gap = 3;
+
+		auto pb = new Pixbuf(GdkColorspace.RGB, true, 8, size, size);
+		pb.fill(0x00000000);
+
+		auto pixels = cast(ubyte[])pb.getPixelsWithLength();
+		auto stride = pb.getRowstride();
+
+		void put(int x, int y, ubyte v)
+		{
+			if (x < 0 || y < 0 || x >= size || y >= size) return;
+			auto p = pixels[y * stride + x * 4 .. y * stride + x * 4 + 4];
+			if (p[3] != 0 && p[0] == 0) return;  // never paint white over the black line
+			p[] = [v, v, v, 255];
+		}
+
+		foreach (pass; 0 .. 2)
+		{
+			// First the white border, then the black line over it
+			ubyte v = pass == 0 ? 255 : 0;
+
+			foreach (d; gap + 1 .. center + 1)
+			{
+				foreach (side; [-1, 1])
+				{
+					auto x = center + side * d;
+					auto y = center + side * d;
+
+					if (pass == 0)
+					{
+						put(x, center - 1, v); put(x, center + 1, v);
+						put(center - 1, y, v); put(center + 1, y, v);
+						if (d == gap + 1) { put(x - side, center, v); put(center, y - side, v); }
+					}
+					else
+					{
+						put(x, center, v);
+						put(center, y, v);
+					}
+				}
+			}
+		}
+
+		return new Cursor(canvas.getDisplay(), pb, center, center);
 	}
 
 	void showError(string message)
@@ -997,7 +1073,8 @@ struct GUI
 					{
 						isGrabbing = true;
 						grabIndex = cast(int)idx;
-						mainWindow.setCursor(editing);
+						// Keep the resize arrow shown on hover while dragging
+						mainWindow.setCursor(directions[idx*2]);
 						return true;
 					}
 				}
@@ -1021,7 +1098,7 @@ struct GUI
 					{
 						isGrabbing = true;
 						grabIndex = cast(int)idx+5;
-						mainWindow.setCursor(editing);
+						mainWindow.setCursor(directions[1+idx*2]);
 						return true;
 					}
 				}
@@ -1354,16 +1431,27 @@ struct GUI
 			{
 				btnExtract.setSensitive = false;
 				cancelExtract = false;
+				auto shuffle = chkShuffleFrames.getActive;
+
+				// Shown at the end, so the user knows where the frames are
+				auto outputDir = buildPath(dirName(video), video.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
+				extractOutputDir = outputDir;
+
+				lblProgress.setText("Starting...");
+				lblProgress.show();
+				pbExtract.setFraction(0);
+				pbExtract.show();
 
 				new Thread({
 					import glib.Idle;
 
-					auto outputDir = buildPath(dirName(video), video.baseName ~ "-" ~ std.conv.to!string(size) ~ "px-" ~ randomUUID.toString);
-
 					// Any failure must reach the GUI, or the Extract button would stay disabled
-					FfmpegError result;
-					try result = extractFrames(video, outputDir, interval, size);
-					catch (Exception e) { warning("Extraction failed: ", e.msg); result = FfmpegError.FFMPEG_ERROR; }
+					ExtractResult result;
+					try result.error = extractFrames(video, outputDir, interval, size, shuffle);
+					catch (Exception e) { warning("Extraction failed: ", e.msg); result.error = FfmpegError.FFMPEG_ERROR; }
+
+					try result.frames = dirEntries(outputDir, "frame*.jpg", SpanMode.shallow).walkLength;
+					catch (Exception e) { }
 
 					Idle.add(&extractResult, idleValue(result));
 				}).start();
@@ -1537,32 +1625,13 @@ struct GUI
 			}
 
 			// Check labels match between AI.labels and GUI.labels
-
-			int[string] guiLabels;
-			foreach(idx, l; GUI.labels)
-				guiLabels[l] = cast(int)idx;
-
-			AI.labelsMap = null;
-
-			foreach(idx, l; AI.labels)
-			{
-				if (l in guiLabels)
-				{
-					assert(GUI.labels[guiLabels[l]] == l);
-					AI.labelsMap[cast(int)idx] = guiLabels[l];
-					debug info("Matching label (AI -> GUI): ", l, "(", idx ,") -> ",  GUI.labels[guiLabels[l]], "(", guiLabels[l], ")");
-				}
-			}
-
-			if(AI.labelsMap.empty)
+			if(!mapAILabels())
 			{
 				auto dialog = new MessageDialog(wndAI, DialogFlags.MODAL, MessageType.WARNING, ButtonsType.CLOSE, "No labels match between the AI labels and the project labels.\nPlease check the files and try again.");
 				dialog.setModal(true);
 				dialog.run();
 				dialog.destroy();
 			}
-
-			mnuAuto.setSensitive(true);
 
 			AI.minConfidence = adjConfidence.getValue() / 100;
 			AI.maxOverlapping = adjOverlapping.getValue() / 100;
@@ -1583,7 +1652,7 @@ struct GUI
 		mainWindow.addOnFocusOut( (Event e, Widget w) { isZooming = false; zoomLines.length = 0; canvas.queueDraw(); return false; } );
 
 
-		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; wndExtract.showAll(); lblProgress.setVisible(false); return true; }); // Resize images
+		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; wndExtract.showAll(); lblProgress.setVisible(false); pbExtract.setVisible(false); return true; }); // Extract frames
 		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
@@ -1623,7 +1692,8 @@ struct GUI
 		mnuCloneLast.addOnButtonPress( (Event e, Widget w){ actionCloneLast(); return true; } );
 
 		readLabels();
-		addWorkingDirectoryChangeCallback( (dir) { mnuAuto.setSensitive(false); readLabels(); } );
+		// A new or reloaded project may have other labels: match them again with the model ones
+		addWorkingDirectoryChangeCallback( (dir) { readLabels(); mapAILabels(); } );
 
 		lstLabels.addOnRowActivated( (path, col, tv) {
 
@@ -1654,10 +1724,12 @@ struct GUI
 		import gtk.CssProvider;
 		import gtk.StyleContext;
 
+		// Bigger rows only for the labels list: a screen-wide style would also change the
+		// file chooser dialogs, which use the same widget
 		CssProvider css = new CssProvider();
 		css.loadFromData("treeview { padding:10px; font-size: 15px;} ");
 
-		StyleContext.addProviderForScreen(mainWindow.getScreen(), css, 800);
+		lstLabels.getStyleContext().addProvider(css, 800);
 
 		search.addOnChanged( (e) { actionSearchLabel(search.getText().strip); } );
 
@@ -1732,7 +1804,6 @@ struct GUI
 		standard = new Cursor(canvas.getDisplay(), "default");
 		hand = new Cursor(canvas.getDisplay(), "grab");
 		handClosed = new Cursor(canvas.getDisplay(), "grabbing");
-		editing = new Cursor(CursorType.DOT);
 
 		directions = [
 			new Cursor(canvas.getDisplay(), "nw-resize"),
@@ -1745,7 +1816,7 @@ struct GUI
 			new Cursor(canvas.getDisplay(), "col-resize")
 		];
 
-		pencil = new Cursor(CursorType.PENCIL);
+		pencil = crosshairCursor();
 	}
 
 	enum FfmpegError
@@ -1755,6 +1826,25 @@ struct GUI
 		FFMPEG_INPUT_FILE_NOT_FOUND,
 		FFMPEG_ERROR,
 		FFMPEG_KILLED
+	}
+
+	// Give the extracted frames random numbers: annotating them in name order, consecutive pictures
+	// won't be nearly identical frames. Names keep the frameNNNNNN.jpg format.
+	void shuffleFrameNames(string dir)
+	{
+		auto frames = dirEntries(dir, "frame*.jpg", SpanMode.shallow).map!(f => f.name).array.sort.array;
+		auto numbers = iota(1, frames.length + 1).array.randomShuffle;
+
+		// Two steps, so a new name never overwrites a frame not renamed yet
+		string[] temp;
+		foreach (i, f; frames)
+		{
+			temp ~= buildPath(dir, format("shuffle-%06d.tmp", i));
+			rename(f, temp[$ - 1]);
+		}
+
+		foreach (i, t; temp)
+			rename(t, buildPath(dir, format("frame%06d.jpg", numbers[i])));
 	}
 
 	struct ResizeProgress
@@ -1800,16 +1890,47 @@ struct GUI
 		return p;
 	}
 
-	extern(C) int extractProgress(void* processed)
+	// Plain values only: copied with malloc, where the GC can't see pointers
+	struct ExtractProgress
+	{
+		double seconds = 0;   // Video time processed
+		double duration = 0;  // Video length, 0 if unknown
+		ulong frames;         // Frames saved so far
+	}
+
+	struct ExtractResult
+	{
+		FfmpegError error;
+		ulong frames;
+	}
+
+	string extractOutputDir;
+
+	static string clock(double seconds)
+	{
+		auto s = cast(long)seconds;
+		return s >= 3600 ? format("%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : format("%d:%02d", s / 60, s % 60);
+	}
+
+	extern(C) int extractProgress(void* data)
 	{
 		import core.stdc.stdlib : free;
-		scope(exit) free(processed);
+		scope(exit) free(data);
 
-		if (lblProgress.getVisible == false)
-			lblProgress.showAll();
+		auto p = *(cast(ExtractProgress*)data);
 
-		auto t = (*(cast(ulong*)processed)).seconds.to!string;
-		lblProgress.setText("Processed: " ~ t);
+		if (p.duration > 0)
+		{
+			auto fraction = min(1.0, p.seconds / p.duration);
+			pbExtract.setFraction(fraction);
+			lblProgress.setText(format("%s of %s (%d%%), %d frames", clock(p.seconds), clock(p.duration), cast(int)(fraction * 100), p.frames));
+		}
+		else
+		{
+			pbExtract.pulse();
+			lblProgress.setText(format("%s processed, %d frames", clock(p.seconds), p.frames));
+		}
+
 		return 0;
 	}
 
@@ -1818,14 +1939,29 @@ struct GUI
 		import core.stdc.stdlib : free;
 		scope(exit) free(result);
 
-		auto r = *(cast(FfmpegError*)result);
+		auto res = *(cast(ExtractResult*)result);
+		auto r = res.error;
 
 		// Killed by Cancel: the window is already closed
 		if (r == FfmpegError.FFMPEG_KILLED) { return 0; }
 
 		btnExtract.setSensitive = true;
 
-		if (r == FfmpegError.NO_ERROR) wndExtract.hide();
+		if (r == FfmpegError.NO_ERROR)
+		{
+			pbExtract.setFraction(1);
+			lblProgress.setText(format("Done, %d frames", res.frames));
+
+			import gtk.MessageDialog;
+			auto dialog = new MessageDialog(wndExtract, DialogFlags.MODAL, MessageType.INFO, ButtonsType.CLOSE, "%s",
+				format("Extracted %d frames into:\n%s", res.frames, extractOutputDir));
+			dialog.addButton("Open folder", 1);
+			auto answer = dialog.run();
+			dialog.destroy();
+
+			if (answer == 1) browse(extractOutputDir);
+			wndExtract.hide();
+		}
 		else
 		{
 			string msg;
@@ -1845,7 +1981,7 @@ struct GUI
 		return 0;
 	}
 
-	FfmpegError extractFrames(string videoPath, string outputDir, ulong delayMs, ulong maxDimension)
+	FfmpegError extractFrames(string videoPath, string outputDir, ulong delayMs, ulong maxDimension, bool shuffle = false)
 	{
 		// Check if ffmpeg exists
 		if (executeShell("ffmpeg -progress - -h").status != 0)
@@ -1868,6 +2004,11 @@ struct GUI
 			"-qscale:v", "2", buildPath(outputDir, "frame%06d.jpg")
 		];
 
+		// Video length, to show a percentage. Unknown if ffprobe isn't there.
+		ExtractProgress progress;
+		try progress.duration = execute(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", videoPath]).output.strip.to!double;
+		catch (Exception e) { }
+
 		// Only stdout (the progress) is read: a piped stderr nobody reads could fill and block ffmpeg
 		auto pipe = pipeProcess(cmd, Redirect.stdout);
 
@@ -1885,26 +2026,29 @@ struct GUI
 			auto line = pipe.stdout.readln('\n');
 			if (line.length == 0) break;
 
-			// Microseconds processed. It can be N/A or negative at the beginning: skip those.
-			if (line.startsWith("out_time_us="))
+			// ffmpeg writes blocks of key=value lines, each closed by "progress=...".
+			// Values can be N/A or negative at the beginning: skip those.
+			try
 			{
-				long us;
-				try us = line["out_time_us=".length .. $].strip.to!long;
-				catch (Exception e) continue;
+				if (line.startsWith("out_time_us="))
+					progress.seconds = max(0, line["out_time_us=".length .. $].strip.to!long) / 1_000_000.0;
+				else if (line.startsWith("frame="))
+					progress.frames = line["frame=".length .. $].strip.to!ulong;
+			}
+			catch (Exception e) { }
 
-				ulong processed = us > 0 ? us / 1_000_000 : 0;
-
-				if(processed > 0)
-				{
-					import glib.Idle;
-					Idle.add(&extractProgress, idleValue(processed));
-				}
+			if (line.startsWith("progress="))
+			{
+				import glib.Idle;
+				Idle.add(&extractProgress, idleValue(progress));
 			}
 		}
 
 		int rc = pipe.pid.wait();
 		if (rc != 0) return FfmpegError.FFMPEG_ERROR;
-		else return FfmpegError.NO_ERROR;
+
+		if (shuffle) shuffleFrameNames(outputDir);
+		return FfmpegError.NO_ERROR;
 	}
 
 }

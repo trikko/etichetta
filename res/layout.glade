@@ -478,14 +478,41 @@
           </packing>
         </child>
         <child>
+          <object class="GtkCheckButton" id="chkShuffleFrames">
+            <property name="label" translatable="yes">Shuffle frame names (similar frames won't be next to each other)</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">False</property>
+            <property name="margin-bottom">20</property>
+            <property name="active">True</property>
+            <property name="draw-indicator">True</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">3</property>
+          </packing>
+        </child>
+        <child>
           <object class="GtkLabel" id="lblProgress">
+            <property name="can-focus">False</property>
+            <property name="margin-bottom">10</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">4</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkProgressBar" id="pbExtract">
             <property name="can-focus">False</property>
             <property name="margin-bottom">20</property>
           </object>
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="position">3</property>
+            <property name="position">5</property>
           </packing>
         </child>
         <child>
@@ -524,7 +551,7 @@
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="position">4</property>
+            <property name="position">6</property>
           </packing>
         </child>
       </object>
@@ -560,14 +587,14 @@
                       <object class="GtkMenuItem" id="mnuOpen">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">Open folder...</property>
+                        <property name="label" translatable="yes">Open project folder...</property>
                       </object>
                     </child>
                     <child>
                       <object class="GtkMenuItem" id="mnuReload">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">Reload folder</property>
+                        <property name="label" translatable="yes">Reload project</property>
                         <accelerator key="F5" signal="activate"/>
                       </object>
                     </child>
