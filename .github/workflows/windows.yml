@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ windows-2022 ]
-        dc: [ dmd-latest ]
+        dc: [ ldc-latest ]
         arch: [ x86_64 ]
 
     runs-on: ${{ matrix.os }}
