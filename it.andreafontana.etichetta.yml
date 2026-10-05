@@ -86,7 +86,7 @@ modules:
       - type: git
         url: https://github.com/trikko/etichetta.git
         tag: v0.1.6
-        commit: f0f17bec7c828eebd90ddb4457c43a7a6c414dbd
+        commit: e4c24f672765c0432c10f57c0791372499bbf317
     build-commands:
       # We need ext/onnx to exist for dub.json paths
       - mkdir -p ext/onnx
