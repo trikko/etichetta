@@ -46,9 +46,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="0.1.6" date="2026-10-04">
+    <release version="0.1.6" date="2026-10-05">
       <description>
-        <p>Flatpak support. Frame extraction works with paths containing spaces.</p>
+        <p>New project window and "Add pictures to project". AI assist supports YOLOv5/v7, YOLOv8 to YOLO26 and RT-DETR models, runs on the GPU through WebGPU, and a script trains a model from your project. Status bar, AI badge, a margin around the picture, Flatpak support and many fixes.</p>
       </description>
     </release>
     <release version="0.1.5" date="2026-10-04">
