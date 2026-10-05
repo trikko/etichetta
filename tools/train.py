@@ -22,6 +22,7 @@ load them in Etichetta from Edit > AI settings.
 """
 
 import argparse
+import math
 import os
 import random
 import shutil
@@ -31,6 +32,12 @@ from datetime import datetime
 from pathlib import Path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+BATCH = 16              # default images per batch
+NBS = 64                # Ultralytics default: images seen before each weights update
+MIN_STEPS = 4           # fewer weights updates per epoch than this: update after each batch
+PATIENCE = 30           # default early stopping
+MIN_VAL_IMAGES = 10     # fewer validation images than this: no early stopping, keep the last epoch
 
 
 def read_classes(project):
@@ -144,7 +151,7 @@ def build_dataset(project, classes, dest, val_fraction, include_unlabeled, seed)
         shown = ", ".join(missing[:10]) + (f" and {len(missing) - 10} more" if len(missing) > 10 else "")
         print(f"Warning: no examples for {shown}. The model won't learn these classes.")
 
-    return dest / "data.yaml"
+    return dest / "data.yaml", len(splits["train"]), len(splits["val"])
 
 
 def json_string(s):
@@ -163,9 +170,11 @@ def main():
                         help="starting model: yolo11n/s/m/l/x.pt, yolov8n.pt, yolo26n.pt... (downloaded automatically) "
                              "or a .pt you trained before. Bigger models are more accurate and slower")
     parser.add_argument("--epochs", type=int, default=100, help="training epochs")
-    parser.add_argument("--patience", type=int, default=30, help="stop early after this many epochs without improvements")
+    parser.add_argument("--patience", type=int, default=None,
+                        help="stop early after this many epochs without improvements. Default: 30, off with few validation images")
     parser.add_argument("--imgsz", type=int, default=640, help="image size used by the model")
-    parser.add_argument("--batch", type=int, default=16, help="images per batch: lower it if you run out of memory")
+    parser.add_argument("--batch", type=int, default=None,
+                        help="images per batch: lower it if you run out of memory. Default: 16, less with few images")
     parser.add_argument("--device", default=None, help="cpu, 0 (first GPU), 0,1 (two GPUs), mps (Apple). Default: GPU if available")
     parser.add_argument("--val", type=float, default=0.2, help="fraction of images used for validation")
     parser.add_argument("--seed", type=int, default=0, help="random seed for the train/validation split")
@@ -188,15 +197,33 @@ def main():
     name = args.name or datetime.now().strftime("%Y%m%d-%H%M%S")
     out = (args.output or project / "models").resolve() / name
 
-    data = build_dataset(project, classes, out / "dataset", args.val, args.include_unlabeled, args.seed)
+    data, n_train, n_val = build_dataset(project, classes, out / "dataset", args.val, args.include_unlabeled, args.seed)
+
+    # Ultralytics updates the weights every NBS images: with few images that's once every few epochs.
+    # Then use smaller batches and update after each one.
+    batch = args.batch or min(BATCH, max(2, n_train // 4))
+    nbs = NBS
+    steps = math.ceil(n_train / batch) / max(1, round(NBS / batch))
+    if steps < MIN_STEPS:
+        nbs = batch
+        print(f"Few images: batches of {batch}, weights updated after each one")
+
+    # A few validation images give a random score: early stopping and the "best" epoch would be chosen by chance.
+    # Then train for all the epochs and keep the last one.
+    small_val = n_val < MIN_VAL_IMAGES
+    patience = args.patience if args.patience is not None else (0 if small_val else PATIENCE)
+    if small_val:
+        print(f"Warning: only {n_val} validation images, their score is not reliable. "
+              f"Training for all {args.epochs} epochs and keeping the last one. Annotate more images for a better model.")
 
     model = YOLO(args.model)
     model.train(
         data=str(data),
         epochs=args.epochs,
-        patience=args.patience,
+        patience=patience,
         imgsz=args.imgsz,
-        batch=args.batch,
+        batch=batch,
+        nbs=nbs,
         device=args.device,
         seed=args.seed,
         project=str(out),
@@ -204,7 +231,7 @@ def main():
         exist_ok=True,
     )
 
-    best = out / "training" / "weights" / "best.pt"
+    best = out / "training" / "weights" / ("last.pt" if small_val else "best.pt")
 
     # opset 17 keeps the model readable by the onnxruntime shipped with Etichetta
     onnx = Path(YOLO(str(best)).export(format="onnx", imgsz=args.imgsz, opset=17))

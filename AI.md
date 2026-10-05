@@ -71,9 +71,9 @@ Useful options (`--help` lists them all):
 | Option | Default | |
 |---|---|---|
 | `--model` | `yolo11n.pt` | starting model: `yolo11s.pt`, `yolo11m.pt`... are more accurate and slower. You can also pass a `.pt` you trained before |
-| `--epochs` | `100` | training epochs. Training stops earlier if it doesn't improve for `--patience` epochs |
+| `--epochs` | `100` | training epochs. Training stops earlier if it doesn't improve for `--patience` epochs (`30`). With less than 10 validation images there is no early stop and the last epoch is kept: their score is too random to pick the best one |
 | `--imgsz` | `640` | image size used by the model |
-| `--batch` | `16` | lower it if you run out of memory |
+| `--batch` | `16` | lower it if you run out of memory. With few images it is lowered by itself, so the model is updated several times per epoch |
 | `--device` | GPU if available | `cpu`, `0` for the first GPU, `mps` on Apple Silicon |
 | `--val` | `0.2` | fraction of images used for validation |
 | `--include-unlabeled` | off | use images without annotations as background |
