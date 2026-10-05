@@ -273,10 +273,8 @@ struct GUI
 
 	void actionToggleGuides()
 	{
-		showGuides = !showGuides;
-
-		mnuGuides.setActive(showGuides);
-		canvas.queueDraw();
+		// The menu check is the state: changing it calls the toggled handler, which redraws
+		mnuGuides.setActive(!mnuGuides.getActive);
 	}
 
 	void actionPictureCycling(bool forward, bool toAnnotate = false)
@@ -1677,7 +1675,9 @@ struct GUI
 		mnuUndo.addOnButtonPress( (Event e, Widget w){ actionUndo(); return true; } );
 		mnuRedo.addOnButtonPress( (Event e, Widget w){ actionRedo(); return true; } );
 
-		mnuGuides.addOnButtonPress( (Event e, Widget w){ actionToggleGuides(); return true; } );
+		// GTK toggles the check by itself on click: just follow it
+		import gtk.CheckMenuItem : CheckMenuItem;
+		mnuGuides.addOnToggled( (CheckMenuItem m){ showGuides = m.getActive; canvas.queueDraw(); } );
 
 		mnuSetCurrentLabel.addOnButtonPress( (Event e, Widget w){ search.setText(""); actionSearchLabel(""); wndLabels.showAll(); return true; } );
 
