@@ -286,6 +286,7 @@ struct Picture
 			GUI.resetZoom();
 
 		status = State.EDITING;
+		GUI.updateStatus();
 		canvas.queueDraw();
 		return true;
 	}
@@ -425,6 +426,7 @@ struct Picture
 
 		Picture.ViewPort.invalidated = true;
 		status = State.EDITING;
+		GUI.updateStatus();
 		return true;
 	}
 

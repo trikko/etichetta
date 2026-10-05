@@ -74,6 +74,7 @@ struct GUI
 
 	string 			lastDirectory;
 	ListStore		newPictures;
+	double			aiBadge = 0;	// Opacity of the AI badge on the picture: 0 is hidden
 
 	Rectangle calculateBoundingBox(in Point[] points)
 	{
@@ -707,15 +708,60 @@ struct GUI
 		else if (!AI.hasModel) actionShowAISettings();
 		else
 		{
+			// Pressing A again while the model runs would start it twice
+			static bool running = false;
+			if (running) return;
+			running = true;
+			scope(exit) running = false;
+
+			// Show the AI badge before the model blocks the UI
+			import glib.Timeout;
+			static Timeout hideBadge;
+			if (hideBadge !is null) { hideBadge.stop(); hideBadge = null; }
+
+			aiBadge = 1;
+			canvas.queueDraw();
+			while (Main.eventsPending) Main.iteration;
+
+			auto start = MonoTime.currTime;
+
 			try
 			{
 				AI.boxes();
 				Picture.writeAnnotations();
 			}
-			catch (Exception e) { showError("AI annotation failed:\n" ~ e.msg); }
+			catch (Exception e) { aiBadge = 0; canvas.queueDraw(); showError("AI annotation failed:\n" ~ e.msg); return; }
 
+			updateHistoryMenu();
 			canvas.queueDraw();
+
+			// Fade the badge out: it's gone 500 ms after the start, or shortly after the end if the model is slower
+			auto fade = max(150, 500 - (MonoTime.currTime - start).total!"msecs");
+			auto fadeStart = MonoTime.currTime;
+
+			hideBadge = new Timeout(30, delegate bool() {
+				aiBadge = 1.0 - cast(double)(MonoTime.currTime - fadeStart).total!"msecs" / fade;
+				canvas.queueDraw();
+
+				if (aiBadge > 0) return true;
+				aiBadge = 0;
+				hideBadge = null;
+				return false;
+			});
 		}
+	}
+
+	// Project folder, picture name and position in the status bar
+	void updateStatus()
+	{
+		if (Picture.list.empty) { lblStatus.setText(""); return; }
+
+		// The example project lives in a temp folder with a random name
+		auto project = baseName(workingDirectory);
+		if (project.startsWith("etichetta_example-")) project = "example project";
+
+		lblStatus.setText(format("%s  ›  %s  ·  %d/%d", project, baseName(Picture.current), Picture.index + 1, Picture.list.length));
+		lblStatus.setTooltipText(Picture.current);
 	}
 
 	// Cursor for drawing boxes: a thin crosshair with a gap in the middle, so the exact pixel stays
@@ -1121,6 +1167,30 @@ struct GUI
 
 			}
 
+		}
+
+		// The AI is running: a round badge in the top right corner of the picture
+		if (aiBadge > 0)
+		{
+			enum radius = 13, inset = 10;
+			auto cx = Picture.ViewPort.width - Picture.ViewPort.offsetX - inset - radius;
+			auto cy = Picture.ViewPort.offsetY + inset + radius;
+
+			w.setDash([], 0);
+			w.arc(cx, cy, radius, 0, 2 * PI);
+			w.setSourceRgba(0, 0, 0, 0.5 * aiBadge);
+			w.fillPreserve();
+			w.setSourceRgba(1, 1, 1, 0.6 * aiBadge);
+			w.setLineWidth(1.5);
+			w.stroke();
+
+			cairo_text_extents_t te;
+			w.selectFontFace("Sans", cairo_font_slant_t.NORMAL, cairo_font_weight_t.BOLD);
+			w.setFontSize(10);
+			w.textExtents("AI", &te);
+			w.setSourceRgba(1, 1, 1, 0.9 * aiBadge);
+			w.moveTo(cx - te.width / 2 - te.xBearing, cy - te.height / 2 - te.yBearing);
+			w.showText("AI");
 		}
 
 		return true;

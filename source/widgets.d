@@ -120,6 +120,7 @@ mixin GtkAttributes;
 @ui CheckButton      chkAIGpu;
 @ui CheckButton      chkShuffleFrames;
 @ui Label            lblAIInfo;
+@ui Label            lblStatus;
 
 @ui Entry			   search;
 @ui TreeView		   lstLabels;
