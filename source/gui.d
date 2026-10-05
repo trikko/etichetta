@@ -32,7 +32,7 @@ import common;
 import picture;
 import widgets;
 
-import gtk.Main, gtk.TreeStore, gtk.TreeIter, gtk.ListStore, gtk.TreeViewColumn, gtk.Button, gtk.Widget, gtk.CellRendererText, gtk.CellRendererPixbuf, gtk.FileChooserDialog;
+import gtk.Main, gtk.Window, gtk.TreeStore, gtk.TreeIter, gtk.ListStore, gtk.TreeViewColumn, gtk.Button, gtk.Widget, gtk.CellRendererText, gtk.CellRendererPixbuf, gtk.FileChooserDialog;
 import gdk.Cursor, gdk.Event, gdk.Keysyms, gdk.Pixbuf;
 import gdk.Cairo : setSourcePixbuf;
 
@@ -298,11 +298,12 @@ struct GUI
 			entNewFolder.setText(dialog.getFilename);
 	}
 
-	void actionNewProjectAddPictures()
+	// Let the user choose some pictures. Empty if cancelled.
+	string[] choosePictures(Window parent)
 	{
 		import gtk.FileFilter;
 
-		auto dialog = new FileChooserDialog("Add pictures to the project", wndNewProject, FileChooserAction.OPEN, ["Cancel", "Add"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
+		auto dialog = new FileChooserDialog("Add pictures to the project", parent, FileChooserAction.OPEN, ["Cancel", "Add"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
 		dialog.setModal(true);
 		dialog.setCurrentFolder(lastDirectory);
 		dialog.setSelectMultiple(true);
@@ -315,13 +316,39 @@ struct GUI
 		scope(exit) dialog.destroy();
 
 		if (dialog.run() != ResponseType.ACCEPT)
-			return;
+			return null;
 
 		auto list = dialog.getFilenames();
-		if (list is null) return;
+		if (list is null) return null;
 
+		auto files = list.toArray!string;
+		if (!files.empty) lastDirectory = dirName(files[$-1]);
+		return files;
+	}
+
+	// Copy pictures into the images folder of a project. Returns the copies.
+	string[] copyPictures(string[] pictures, string dir)
+	{
+		string[] copies;
+
+		foreach(src; pictures)
+		{
+			// Pictures from different folders may have the same name
+			auto dst = buildPath(dir, "images", baseName(src));
+			for (int i = 2; exists(dst); i++)
+				dst = buildPath(dir, "images", format("%s_%d%s", baseName(src).stripExtension, i, extension(src)));
+
+			copy(src, dst);
+			copies ~= dst;
+		}
+
+		return copies;
+	}
+
+	void actionNewProjectAddPictures()
+	{
 		auto already = newProjectPictures();
-		foreach(f; list.toArray!string)
+		foreach(f; choosePictures(wndNewProject))
 		{
 			if (already.canFind(f)) continue;
 			TreeIter it;
@@ -329,8 +356,31 @@ struct GUI
 			newPictures.setValue(it, 0, f);
 			already ~= f;
 		}
+	}
 
-		lastDirectory = dirName(already[$-1]);
+	// Copy pictures into the current project and show the first one
+	void actionAddPictures()
+	{
+		// The example project is deleted on exit
+		if (baseName(workingDirectory).startsWith("etichetta_example-"))
+		{
+			showError("This is the example project: it is deleted on exit.\nCreate a project with File > New project..., or open one, then add your pictures.");
+			return;
+		}
+
+		auto pictures = choosePictures(mainWindow);
+		if (pictures.empty) return;
+
+		string[] copies;
+		try copies = copyPictures(pictures, workingDirectory);
+		catch (Exception e) { showError("Can't copy the pictures:\n" ~ e.msg); }
+
+		if (copies.empty) return;
+
+		reloadDirectory();
+
+		auto found = Picture.list.countUntil(copies[0]);
+		if (found >= 0) { Picture.index = found; Picture.loadCurrent(); }
 	}
 
 	void actionNewProjectRemovePictures()
@@ -405,15 +455,7 @@ struct GUI
 				if (classes.empty) std.file.write(buildPath(dir, "labels", "example_01.txt"), LABELS);
 			}
 
-			foreach(src; pictures)
-			{
-				// Pictures from different folders may have the same name
-				auto dst = buildPath(dir, "images", baseName(src));
-				for (int i = 2; exists(dst); i++)
-					dst = buildPath(dir, "images", format("%s_%d%s", baseName(src).stripExtension, i, extension(src)));
-
-				copy(src, dst);
-			}
+			copyPictures(pictures, dir);
 		}
 		catch (Exception e) { error("Can't create the project:\n" ~ e.msg); return; }
 
@@ -1886,6 +1928,7 @@ struct GUI
 		lstNewPictures.appendColumn(new TreeViewColumn("Picture", new CellRendererText(), "text", 0));
 		lstNewPictures.getSelection().setMode(SelectionMode.MULTIPLE);
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
+		mnuAddPictures.addOnButtonPress((Event e, Widget w){ actionAddPictures(); return true; }); // Copy pictures into the project
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 
 		mnuExit.addOnButtonPress( (Event e, Widget w){ Main.quit(); return true; } );

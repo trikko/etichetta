@@ -80,6 +80,7 @@ mixin GtkAttributes;
 @ui MenuItem		   mnuExit;
 @ui MenuItem		   mnuNew;
 @ui MenuItem		   mnuOpen;
+@ui MenuItem         mnuAddPictures;
 @ui MenuItem         mnuReload;
 @ui MenuItem		   mnuNextImage;
 @ui MenuItem 		   mnuPrevImage;

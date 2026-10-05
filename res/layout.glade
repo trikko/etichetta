@@ -598,6 +598,13 @@
                       </object>
                     </child>
                     <child>
+                      <object class="GtkMenuItem" id="mnuAddPictures">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Add pictures to project...</property>
+                      </object>
+                    </child>
+                    <child>
                       <object class="GtkMenuItem" id="mnuReload">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
