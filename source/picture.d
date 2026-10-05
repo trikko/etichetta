@@ -426,7 +426,6 @@ struct Picture
 
 		Picture.ViewPort.invalidated = true;
 		status = State.EDITING;
-		GUI.updateStatus();
 		return true;
 	}
 
