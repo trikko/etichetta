@@ -46,6 +46,7 @@ struct Picture
 		int		height;
 
 		double	scale = 1.0;			// Scale factor: 2.0 means that the image is zoomed 2x.
+		int		margin = 20;			// Free space around the image, in pixels: to grab the borders with the mouse
 		bool		invalidated = true;	// If true, the rendered pixbuf must be regenerated
 
 		// Center the image in the viewport if image is smaller than the viewport
@@ -71,11 +72,16 @@ struct Picture
 				result = null;
 			}
 
+			// The image is fitted inside the viewport, minus the margin
+			int border = min(margin, min(width, height) / 4);
+			int innerW = max(1, width - 2 * border);
+			int innerH = max(1, height - 2 * border);
+
 			// Calculate the crop area and expand it to fit the viewport proportions
 			double minCropW = roiBottomRight.x - roiTopLeft.x;
 			double minCropH = roiBottomRight.y - roiTopLeft.y;
 
-			double vpScale = 1.0 * width / height;
+			double vpScale = 1.0 * innerW / innerH;
 
 			double adjustedCropW = minCropW;
 			double adjustedCropH = minCropW / vpScale;
@@ -109,8 +115,8 @@ struct Picture
 			);
 
 			// Scale cropped to fit the viewport
-			double scaledW = cast(double)(cropped.getWidth) / width;
-			double scaledH = cast(double)(cropped.getHeight) / height;
+			double scaledW = cast(double)(cropped.getWidth) / innerW;
+			double scaledH = cast(double)(cropped.getHeight) / innerH;
 
 			scale = 1.0 / max(scaledW, scaledH);
 
