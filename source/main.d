@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 module main;
 
-import std.file : write, tempDir, exists, mkdirRecurse, rmdirRecurse;
+import std.file : tempDir, rmdirRecurse;
 import std.path : buildPath;
 import std.logger : info, warning;
 
@@ -51,17 +51,7 @@ int mainImpl(string[] args)
 	// Write example files to a temp dir. Its name is unique: another instance may be using its own.
 	import std.uuid : randomUUID;
 	auto tmpDir = buildPath(tempDir(), "etichetta_example-" ~ randomUUID.toString);
-	auto tmpImagesDir = buildPath(tmpDir, "images");
-	auto tmpLabelsDir = buildPath(tmpDir, "labels");
-
-	if (!exists(tmpDir)) mkdirRecurse(tmpDir);
-	if (!exists(tmpImagesDir)) mkdirRecurse(tmpImagesDir);
-	if (!exists(tmpLabelsDir)) mkdirRecurse(tmpLabelsDir);
-
-	write(buildPath(tmpDir, "classes.txt"), CLASSES);
-	write(buildPath(tmpLabelsDir, "example_01.txt"), LABELS);
-	write(buildPath(tmpImagesDir, "example_01.jpg"), EXAMPLES[0]);
-	write(buildPath(tmpImagesDir, "example_02.jpg"), EXAMPLES[1]);
+	writeExampleProject(tmpDir);
 
 	// Delete temp dir on exit
 	scope(exit) deleteExamples(tmpDir);

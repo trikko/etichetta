@@ -30,7 +30,7 @@ import gtkattributes;
 import gtk.Button;
 
 import gtk.Main, gtk.Builder, gtk.Window, gtk.DrawingArea, gtk.EventBox, gtk.Button, gtk.CheckButton, gtk.Adjustment, gtk.Label,
-   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton;
+   gtk.CheckMenuItem, gtk.MenuItem, gtk.Entry, gtk.TreeView, gtk.Dialog, gtk.Image, gtk.FileChooserButton, gtk.TextView;
    import gtk.Adjustment;
    import gtk.ProgressBar;
 
@@ -42,6 +42,16 @@ mixin GtkAttributes;
 @ui Window   		   mainWindow;
 @ui Dialog           wndAI;
 @ui Window           wndResize;
+@ui Window           wndNewProject;
+
+@ui Entry            entNewFolder;
+@ui Button           btnNewBrowse;
+@ui TreeView         lstNewPictures;
+@ui Button           btnNewAddPictures;
+@ui Button           btnNewRemovePictures;
+@ui TextView         txtNewLabels;
+@ui Button           btnNewCreate;
+@ui Button           btnNewCancel;
 
 @ui ProgressBar      pbResize;
 @ui Button           btnResizeCancel;
@@ -68,6 +78,7 @@ mixin GtkAttributes;
 @ui Adjustment       adjConfidence;
 
 @ui MenuItem		   mnuExit;
+@ui MenuItem		   mnuNew;
 @ui MenuItem		   mnuOpen;
 @ui MenuItem         mnuReload;
 @ui MenuItem		   mnuNextImage;

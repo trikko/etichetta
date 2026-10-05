@@ -32,7 +32,7 @@ import common;
 import picture;
 import widgets;
 
-import gtk.Main, gtk.TreeStore, gtk.Widget, gtk.CellRendererText, gtk.CellRendererPixbuf, gtk.FileChooserDialog;
+import gtk.Main, gtk.TreeStore, gtk.TreeIter, gtk.ListStore, gtk.TreeViewColumn, gtk.Button, gtk.Widget, gtk.CellRendererText, gtk.CellRendererPixbuf, gtk.FileChooserDialog;
 import gdk.Cursor, gdk.Event, gdk.Keysyms, gdk.Pixbuf;
 import gdk.Cairo : setSourcePixbuf;
 
@@ -73,6 +73,7 @@ struct GUI
 	Rectangle[]		cloneBuffer;
 
 	string 			lastDirectory;
+	ListStore		newPictures;
 
 	Rectangle calculateBoundingBox(in Point[] points)
 	{
@@ -259,16 +260,164 @@ struct GUI
 				return true;
 			}
 
-			// If keeping zoom on exit is not active, reset the viewport
-			if (!mnuZoomOnExit.getActive)
-				resetZoom();
-
-			workingDirectory = dialog.getFilename;
-			resetCurrentDirectory(workingDirectory);
-
+			openProject(dialog.getFilename);
 		}
 
 		return true;
+	}
+
+	void openProject(string dir)
+	{
+		// If keeping zoom on exit is not active, reset the viewport
+		if (!mnuZoomOnExit.getActive)
+			resetZoom();
+
+		workingDirectory = dir;
+		resetCurrentDirectory(workingDirectory);
+	}
+
+	// Show the New project window, empty
+	void actionNewProject()
+	{
+		entNewFolder.setText("");
+		newPictures.clear();
+		txtNewLabels.getBuffer().setText("");
+		wndNewProject.showAll();
+	}
+
+	void actionNewProjectBrowse()
+	{
+		// The dialog can also create the folder
+		auto dialog = new FileChooserDialog("Choose a folder for the new project", wndNewProject, FileChooserAction.CREATE_FOLDER, ["Cancel", "Select"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
+		dialog.setModal(true);
+		dialog.setCurrentFolder(lastDirectory);
+		scope(exit) dialog.destroy();
+
+		if (dialog.run() == ResponseType.ACCEPT)
+			entNewFolder.setText(dialog.getFilename);
+	}
+
+	void actionNewProjectAddPictures()
+	{
+		import gtk.FileFilter;
+
+		auto dialog = new FileChooserDialog("Add pictures to the project", wndNewProject, FileChooserAction.OPEN, ["Cancel", "Add"], [ResponseType.CANCEL, ResponseType.ACCEPT]);
+		dialog.setModal(true);
+		dialog.setCurrentFolder(lastDirectory);
+		dialog.setSelectMultiple(true);
+
+		auto filter = new FileFilter();
+		filter.setName("Pictures (png, jpg, jpeg)");
+		foreach(ext; ["png", "jpg", "jpeg"]) { filter.addPattern("*." ~ ext); filter.addPattern("*." ~ ext.toUpper); }
+		dialog.addFilter(filter);
+
+		scope(exit) dialog.destroy();
+
+		if (dialog.run() != ResponseType.ACCEPT)
+			return;
+
+		auto list = dialog.getFilenames();
+		if (list is null) return;
+
+		auto already = newProjectPictures();
+		foreach(f; list.toArray!string)
+		{
+			if (already.canFind(f)) continue;
+			TreeIter it;
+			newPictures.append(it);
+			newPictures.setValue(it, 0, f);
+			already ~= f;
+		}
+
+		lastDirectory = dirName(already[$-1]);
+	}
+
+	void actionNewProjectRemovePictures()
+	{
+		import gtk.TreePath, gtk.TreeModelIF;
+
+		TreeModelIF model;
+		auto selected = lstNewPictures.getSelection().getSelectedRows(model);
+
+		// Remove from the last one, so the other paths stay valid
+		foreach_reverse(path; selected)
+		{
+			TreeIter it;
+			if (newPictures.getIter(it, path)) newPictures.remove(it);
+		}
+	}
+
+	string[] newProjectPictures()
+	{
+		string[] files;
+		TreeIter it;
+
+		if (newPictures.getIterFirst(it))
+			do files ~= newPictures.getValueString(it, 0); while (newPictures.iterNext(it));
+
+		return files;
+	}
+
+	void actionNewProjectCreate()
+	{
+		import gtk.MessageDialog;
+
+		void error(string message)
+		{
+			auto dialog = new MessageDialog(wndNewProject, DialogFlags.MODAL, MessageType.ERROR, ButtonsType.CLOSE, "%s", message);
+			dialog.run();
+			dialog.destroy();
+		}
+
+		auto dir = entNewFolder.getText().strip.expandTilde;
+		auto pictures = newProjectPictures();
+		auto classes = txtNewLabels.getBuffer().getText().lineSplitter.map!(l => l.strip).filter!(l => l.length > 0).array;
+
+		if (dir.empty) { error("Choose the project folder."); return; }
+		if (!dir.isAbsolute) { error("The project folder must be a full path."); return; }
+
+		// Never touch a folder with something inside
+		if (exists(dir) && (!isDir(dir) || !dirEntries(dir, SpanMode.shallow).empty))
+		{
+			error("The project folder must be new or empty.");
+			return;
+		}
+
+		if (!pictures.empty && classes.empty) { error("Write the labels of your pictures, one per line."); return; }
+
+		try
+		{
+			import imports : EXAMPLES, LABELS, CLASSES;
+
+			mkdirRecurse(buildPath(dir, "images"));
+			mkdirRecurse(buildPath(dir, "labels"));
+
+			if (classes.empty) std.file.write(buildPath(dir, "classes.txt"), CLASSES);
+			else std.file.write(buildPath(dir, "classes.txt"), classes.join("\n") ~ "\n");
+
+			if (pictures.empty)
+			{
+				std.file.write(buildPath(dir, "images", "example_01.jpg"), EXAMPLES[0]);
+				std.file.write(buildPath(dir, "images", "example_02.jpg"), EXAMPLES[1]);
+
+				// The example annotation only makes sense with the example labels
+				if (classes.empty) std.file.write(buildPath(dir, "labels", "example_01.txt"), LABELS);
+			}
+
+			foreach(src; pictures)
+			{
+				// Pictures from different folders may have the same name
+				auto dst = buildPath(dir, "images", baseName(src));
+				for (int i = 2; exists(dst); i++)
+					dst = buildPath(dir, "images", format("%s_%d%s", baseName(src).stripExtension, i, extension(src)));
+
+				copy(src, dst);
+			}
+		}
+		catch (Exception e) { error("Can't create the project:\n" ~ e.msg); return; }
+
+		wndNewProject.hide();
+		openProject(dir);
 	}
 
 	void actionToggleGuides()
@@ -1652,6 +1801,20 @@ struct GUI
 
 		mnuExtract.addOnButtonPress((Event e, Widget w){  btnExtract.setSensitive = true; wndExtract.showAll(); lblProgress.setVisible(false); pbExtract.setVisible(false); return true; }); // Extract frames
 		mnuResize.addOnButtonPress((Event e, Widget w){  btnResize.setSensitive = true; pbResize.setFraction(0); wndResize.showAll(); return true; }); // Resize images
+		mnuNew.addOnButtonPress((Event e, Widget w){ actionNewProject(); return true; }); // Create a new project
+
+		wndNewProject.setIcon(logo);
+		wndNewProject.addOnDelete( (Event e, Widget w){ wndNewProject.hide(); return true; } );
+		btnNewCancel.addOnClicked( (Button b){ wndNewProject.hide(); } );
+		btnNewBrowse.addOnClicked( (Button b){ actionNewProjectBrowse(); } );
+		btnNewAddPictures.addOnClicked( (Button b){ actionNewProjectAddPictures(); } );
+		btnNewRemovePictures.addOnClicked( (Button b){ actionNewProjectRemovePictures(); } );
+		btnNewCreate.addOnClicked( (Button b){ actionNewProjectCreate(); } );
+
+		newPictures = new ListStore([GType.STRING]);
+		lstNewPictures.setModel(newPictures);
+		lstNewPictures.appendColumn(new TreeViewColumn("Picture", new CellRendererText(), "text", 0));
+		lstNewPictures.getSelection().setMode(SelectionMode.MULTIPLE);
 		mnuOpen.addOnButtonPress((Event e, Widget w){ actionOpenDir(); return true; }); // Open a directory
 		mnuReload.addOnButtonPress((Event e, Widget w){ reloadDirectory(); return true; }); // Reload the current directory
 

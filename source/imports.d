@@ -30,3 +30,17 @@ immutable static LABELS    = import("labels/example_a.txt");
 immutable static CLASSES   = import("classes.txt");
 immutable static EXAMPLES  = [ import("images/example_a.jpg"), import("images/example_b.jpg") ];
 immutable static LOGO      = import("etichetta.svg");
+// Write the example project (images, labels and classes) into dir
+void writeExampleProject(string dir)
+{
+	import std.file : write, mkdirRecurse;
+	import std.path : buildPath;
+
+	mkdirRecurse(buildPath(dir, "images"));
+	mkdirRecurse(buildPath(dir, "labels"));
+
+	write(buildPath(dir, "classes.txt"), CLASSES);
+	write(buildPath(dir, "labels", "example_01.txt"), LABELS);
+	write(buildPath(dir, "images", "example_01.jpg"), EXAMPLES[0]);
+	write(buildPath(dir, "images", "example_02.jpg"), EXAMPLES[1]);
+}
