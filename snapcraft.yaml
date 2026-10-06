@@ -4,41 +4,47 @@ summary: A YOLO annotator, for human beings
 description: |
   Etichetta is a YOLO annotator, for human beings. It allows you to
   annotate images with bounding boxes, and save the annotations in the YOLO
-  format.
-confinement: classic
+  format. A YOLO model in ONNX format can propose the boxes, on the GPU
+  through WebGPU.
+confinement: strict
 grade: stable
 base: core24
 icon: snap/gui/etichetta.png
 
+# onnxruntime is downloaded for x86_64 only
+platforms:
+  amd64:
+
+# snap/gui/etichetta.desktop is used as the desktop entry of the app
 apps:
   etichetta:
-    environment:
-      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAPCRAFT_PART_INSTALL
-    command: etichetta
+    command: bin/etichetta
+    extensions: [gnome]
+    plugs:
+      - home
+      - opengl
 
 parts:
   etichetta:
-    source: https://github.com/trikko/etichetta.git
-    source-type: git
-    plugin: make
-    override-build: |
-      dub run :setup && dub build --build=release && mv ext/onnx/lib/libonnx* $SNAPCRAFT_PART_INSTALL && mv output/bin/etichetta $SNAPCRAFT_PART_INSTALL/etichetta
+    plugin: nil
+    source: .
     build-packages:
-    - build-essential
-    - ldc
-    - dub
-    stage-packages:
-    - libgtk-3-0
-    - libgdk-pixbuf2.0-dev
-    - libglib2.0-0
-    - libgobject-2.0-0
-    - libgio-2.0-0
-    - libpango-1.0-0
-    - libpangocairo-1.0-0
-    - libcairo2
-    - libpng-dev
-    - libjpeg-dev
-    - libphobos2-ldc-shared106
+      - curl
+      - xz-utils
+      - patchelf
+      - build-essential
+    override-build: |
+      # The same LDC as the Linux CI, so the snap is built like the AppImage
+      LDC_VERSION=1.43.0
+      curl -fsSL https://github.com/ldc-developers/ldc/releases/download/v$LDC_VERSION/ldc2-$LDC_VERSION-linux-x86_64.tar.xz | tar -xJ -C /tmp
+      export PATH=/tmp/ldc2-$LDC_VERSION-linux-x86_64/bin:$PATH
 
-    build-attributes:
-    - enable-patchelf
+      # The setup downloads onnxruntime and the WebGPU plugin into ext/onnx/lib
+      dub run :setup
+      dub build --compiler=ldc2 --build=release
+
+      # bin/ and lib/, as in the AppImage and the Flatpak: the WebGPU plugin is searched in ../lib
+      install -Dm755 output/bin/etichetta $CRAFT_PART_INSTALL/bin/etichetta
+      patchelf --set-rpath '$ORIGIN/../lib' $CRAFT_PART_INSTALL/bin/etichetta
+      mkdir -p $CRAFT_PART_INSTALL/lib
+      cp -P ext/onnx/lib/libonnxruntime*.so* $CRAFT_PART_INSTALL/lib/
